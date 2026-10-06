@@ -12,7 +12,7 @@ export function createExtendedHero(e,kit){
  const humanoid=({armColor=cloth,armor=false,headColor=skin,hair=0x342c37}={})=>{
   for(const side of[-1,1]){const leg=new THREE.Group();leg.position.set(side*.46,small?.87:1.4,0);body.add(leg);rod(leg,armor?0x858c8f:0x273747,[0,0,0],[0,small?-.64:-1.12,.1],small?.18:.23);box(leg,0x24333e,0,small?-.61:-1.07,.23,[.43,.32,.7]);legs.push(leg);}
   cylinder(body,cloth,0,small?1.52:2.05,0,small?.65:.78,small?1.15:1.65,small?.45:.59);head(headColor);sphere(body,hair,0,height+.3,-.15,[small?.63:.61,.37,.53]);
-  for(const side of[-1,1]){sphere(body,armColor,side*(small?.7:.91),small?1.93:2.69,0,[armor?.52:.3,.36,.35]);rod(body,armColor,[side*(small?.7:.92),small?1.9:2.57,0],[side*(small?.87:1.13),small?1.37:1.97,.4],small?.17:.21);sphere(body,headColor,side*(small?.87:1.13),small?1.35:1.97,.4,[.2,.23,.21]);}
+  const arms=[];for(const side of[-1,1]){sphere(body,armColor,side*(small?.7:.91),small?1.93:2.69,0,[armor?.52:.3,.36,.35]);const arm=new THREE.Group();arm.position.set(side*(small?.7:.92),small?1.9:2.57,0);arm.userData.side=side;arm.userData.hand=[side*(small?.17:.21),small?-.55:-.6,.4];body.add(arm);rod(arm,armColor,[0,0,0],arm.userData.hand,small?.17:.21);sphere(arm,headColor,...arm.userData.hand,[.2,.23,.21]);arms.push(arm);}g.userData.arms=arms;
  };
  const cone=(color,x,y,z,r,h,sides=8)=>part(body,geo(`heroCone:${r}:${h}:${sides}`,()=>new THREE.ConeGeometry(r,h,sides)),color,x,y,z);
  const cape=(color,r=1.2,h=2.3)=>{const mesh=part(body,geo(`heroCape:${r}:${h}`,()=>new THREE.ConeGeometry(r,h,10,1,true)),color,0,1.7,-.5,[1,1,.52]);mesh.rotation.x=.15;return mesh;};

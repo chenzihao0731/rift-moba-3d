@@ -5,6 +5,7 @@ ROOT = pathlib.Path(__file__).resolve().parents[1]
 OUT = ROOT / 'public/assets'
 VERSION = json.load(urllib.request.urlopen('https://ddragon.leagueoflegends.com/api/versions.json'))[0]
 CHAMPIONS = {'annie':'Annie','brand':'Brand','morgana':'Morgana','veigar':'Veigar','ziggs':'Ziggs','fizz':'Fizz','masteryi':'MasterYi','leesin':'LeeSin','darius':'Darius','malphite':'Malphite','blitzcrank':'Blitzcrank','leona':'Leona','vayne':'Vayne','caitlyn':'Caitlyn','missfortune':'MissFortune','sona':'Sona'}
+SUMMONERS = {'flash':'SummonerFlash','ignite':'SummonerDot','heal':'SummonerHeal','ghost':'SummonerHaste','barrier':'SummonerBarrier','exhaust':'SummonerExhaust','cleanse':'SummonerBoost','teleport':'SummonerTeleport','smite':'SummonerSmite','clarity':'SummonerMana'}
 
 def fetch(pair):
     url, filename = pair
@@ -32,5 +33,7 @@ if __name__ == '__main__':
         import subprocess
         catalog = json.loads(subprocess.check_output(['node','--input-type=module','-e',"import {ITEMS} from './src/item-data.js'; console.log(JSON.stringify(ITEMS))"],cwd=ROOT))
         jobs += [(f'https://ddragon.leagueoflegends.com/cdn/{VERSION}/img/item/{item["riotId"]}.png',f'item-{item["id"]}.png') for item in catalog if item.get('riotId')]
+        summoners = json.load(urllib.request.urlopen(f'https://ddragon.leagueoflegends.com/cdn/{VERSION}/data/en_US/summoner.json', timeout=30))['data']
+        jobs += [(f'https://ddragon.leagueoflegends.com/cdn/{VERSION}/img/spell/{summoners[riot]["image"]["full"]}',f'summoner-{key}.png') for key,riot in SUMMONERS.items()]
         fetched = list(pool.map(fetch, jobs))
     print(f'Artwork ready: {len(fetched)} files, Data Dragon {VERSION}')

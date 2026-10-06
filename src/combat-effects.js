@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { SummonerEffects } from './summoner-effects.js';
 
 // One bounded particle batch, plus short lived groups built from shared geometry.
 // Only materials belonging to a temporary group are disposed when it expires.
@@ -14,6 +15,8 @@ export class CombatEffects {
       ['ring', new THREE.RingGeometry(.93, 1, 56)],
       ['arc', new THREE.RingGeometry(.8, 1, 36, 1, 0, Math.PI * 1.35)],
       ['sphere', new THREE.SphereGeometry(1, 10, 8)],
+      ['shield-sphere', new THREE.SphereGeometry(1, 24, 18)],
+      ['chain-link', new THREE.TorusGeometry(1, .2, 5, 12)],
       ['cylinder', new THREE.CylinderGeometry(1, 1, 1, 10, 1, true)],
       ['box', new THREE.BoxGeometry(1, 1, 1)],
       ['crystal', new THREE.OctahedronGeometry(1)],
@@ -53,7 +56,12 @@ export class CombatEffects {
     this.particleGeometry.setDrawRange(0, 0);
     scene.add(this.points);
     this.color = new THREE.Color();
+    this.summoners = new SummonerEffects(this);
   }
+
+  setEntityResolver(resolve, isVisible) { this.summoners.setEntityResolver(resolve, isVisible); }
+
+  summonerEvent(event, source, target) { return this.summoners.event(event, source, target); }
 
   mesh(group, shape, color, opacity = .8) {
     const material = new THREE.MeshBasicMaterial({ color, opacity, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, toneMapped: false });
@@ -74,6 +82,7 @@ export class CombatEffects {
   }
 
   remove(effect) {
+    this.summoners?.removed(effect);
     this.scene.remove(effect.group);
     effect.group.traverse(object => { if (object.isMesh) object.material.dispose(); });
   }

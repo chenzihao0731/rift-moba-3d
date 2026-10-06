@@ -4,30 +4,35 @@ import { CombatEffects } from './combat-effects.js';
 import { createExtendedHero, EXTENDED_HERO_IDS } from './hero-models.js';
 import { applySkin, updateSkin } from './skin-effects.js';
 import { getSkin } from './cosmetics-data.js';
+import { addHeroDetail, curvedTail, restoreFaceMaterials } from './hero-detail.js';
 const materials = new Map(), geometries = new Map();
 const mergedModels=new Map();
+const vertexMaterials=new Map();
 const mat = (color, glow=false) => {const key=color+':'+glow;if(!materials.has(key)) materials.set(key,new THREE.MeshStandardMaterial({color,roughness:glow?.35:.72,metalness:glow?.4:.18,emissive:glow?color:0,emissiveIntensity:glow?.8:0}));return materials.get(key);};
 const geo=(key,fn)=>{if(!geometries.has(key))geometries.set(key,fn());return geometries.get(key);};
 function part(g,geometry,color,x=0,y=0,z=0,scale=[1,1,1],glow=false){const m=new THREE.Mesh(geometry,mat(color,glow));m.position.set(x,y,z);m.scale.set(...scale);m.castShadow=true;m.receiveShadow=true;g.add(m);return m;}
-const sphere=(g,c,x,y,z,s=[1,1,1],glow=false)=>part(g,geo('sphere',()=>new THREE.SphereGeometry(1,10,8)),c,x,y,z,s,glow);
+const sphere=(g,c,x,y,z,s=[1,1,1],glow=false)=>part(g,geo('sphere',()=>new THREE.SphereGeometry(1,16,12)),c,x,y,z,s,glow);
 const box=(g,c,x,y,z,s)=>part(g,geo('box',()=>new THREE.BoxGeometry(1,1,1)),c,x,y,z,s);
-const cylinder=(g,c,x,y,z,r,h,rTop=r,glow=false)=>part(g,geo(`c${r}:${h}:${rTop}`,()=>new THREE.CylinderGeometry(rTop,r,h,10)),c,x,y,z,[1,1,1],glow);
+const cylinder=(g,c,x,y,z,r,h,rTop=r,glow=false)=>part(g,geo(`c${r}:${h}:${rTop}`,()=>new THREE.CylinderGeometry(rTop,r,h,16)),c,x,y,z,[1,1,1],glow);
 const ring=(g,c,r,y,t=.1)=>{const m=part(g,geo(`ring${r}:${t}`,()=>new THREE.TorusGeometry(r,t,5,48)),c,0,y,0,[1,1,1],true);m.rotation.x=Math.PI/2;return m;};
-function rod(g,c,a,b,r=.2){const d=new THREE.Vector3(...b).sub(new THREE.Vector3(...a)),m=part(g,geo('rod',()=>new THREE.CylinderGeometry(1,1,1,6)),c,...a,[r,d.length(),r]);m.position.add(d.multiplyScalar(.5));m.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),d.normalize());return m;}
+function rod(g,c,a,b,r=.2){const d=new THREE.Vector3(...b).sub(new THREE.Vector3(...a)),m=part(g,geo('rod',()=>new THREE.CylinderGeometry(1,1,1,8)),c,...a,[r,d.length(),r]);m.position.add(d.multiplyScalar(.5));m.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),d.normalize());return m;}
 function hero(e){if(EXTENDED_HERO_IDS.includes(e.heroId))return createExtendedHero(e,{sphere,box,cylinder,ring,rod,part,geo});if(e.heroId==='teemo')return scoutHero(e);const g=new THREE.Group(),body=new THREE.Group();g.add(body);g.userData.body=body;const key=e.heroId||'ahri',blue=e.team==='blue',team=blue?0x45deee:0xee5062;
 const colors={ahri:0xb9234b,ashe:0x235c97,garen:0x244c8b,lux:0xe7d1a0,ezreal:0x916139,yasuo:0x345967,jinx:0x6a325f},cloth=colors[key]||0x315c68,skin=0xf4c9af,hair={ahri:0x172338,ashe:0xdcebf4,garen:0x403628,lux:0xeacf70,ezreal:0xdabc58,yasuo:0x202935,jinx:0x229de0}[key]||0x334152;
 ring(g,team,1.6,.12,.07);
 const legs=[];for(const s of [-1,1]){const l=new THREE.Group();l.position.set(s*.48,1.45,0);body.add(l);rod(l,key==='garen'?0x9da5aa:0x293140,[0,0,0],[0,-1.2,.12],.25);box(l,0x28303b,0,-1.15,.24,[.46,.35,.75]);legs.push(l);}g.userData.legs=legs;
 cylinder(body,cloth,0,2.0,0,.9,1.55,.65);sphere(body,skin,0,3.42,0,[.58,.69,.56]);sphere(body,hair,0,3.78,-.1,[.64,.45,.6]);box(body,0xcab784,0,1.55,.78,[1.4,.18,.12]);
-for(const s of [-1,1]){sphere(body,key==='garen'?0xbac5c8:cloth,s*.93,2.66,0,[key==='garen'?.65:.34,.39,.38]);rod(body,cloth,[s*.93,2.55,0],[s*1.15,1.93,.4],.22);sphere(body,skin,s*1.15,1.9,.4,[.22,.25,.22]);}
+const arms=[];for(const s of [-1,1]){sphere(body,key==='garen'?0xbac5c8:cloth,s*.93,2.66,0,[key==='garen'?.65:.34,.39,.38]);const arm=new THREE.Group();arm.position.set(s*.93,2.55,0);arm.userData.side=s;arm.userData.restRotation=0;body.add(arm);rod(arm,cloth,[0,0,0],[s*.22,-.62,.4],.22);sphere(arm,skin,s*.22,-.65,.4,[.22,.25,.22]);arms.push(arm);}g.userData.arms=arms;
 if(key==='ahri'){for(const s of [-1,1]){const ear=part(body,geo('ear',()=>new THREE.ConeGeometry(.28,.9,4)),hair,s*.42,4.25,0);ear.rotation.z=-s*.22;}
-const tails=[];for(let i=0;i<9;i++){const t=new THREE.Group();t.position.set(0,1.85,-.45);body.add(t);const angle=(i-4)*.27;rod(t,0xe7dddf,[0,0,0],[Math.sin(angle)*2.3,1.1,-Math.cos(angle)*2.1],.42);sphere(t,0xfaf2ee,Math.sin(angle)*2.9,1.2,-Math.cos(angle)*2.65,[.45,.55,.9]);t.rotation.x=(i%3)*.18;tails.push(t);}g.userData.tails=tails;sphere(body,0x41e6ec,1.2,2.1,1.05,[.53,.53,.53],true);}
+const tails=[];for(let i=0;i<9;i++){const t=new THREE.Group();t.position.set(0,1.85,-.45);body.add(t);part(t,curvedTail({geo},i),i%2?0xe1d7d4:0xf7eee5);t.rotation.x=(i%3)*.09;tails.push(t);}g.userData.tails=tails;sphere(body,0x41e6ec,1.2,2.1,1.05,[.53,.53,.53],true);}
 if(key==='ashe'){const cloak=part(body,geo('cloak',()=>new THREE.ConeGeometry(1.35,2.4,8,1,true)),0x193d70,0,1.85,-.5,[1,1,.65]);cloak.rotation.x=.1;const bow=part(body,geo('bow',()=>new THREE.TorusGeometry(1.2,.12,5,18,Math.PI)),0x62dff9,-1.3,2.4,.6,[1,1,1],true);bow.rotation.z=-Math.PI/2;rod(body,0xc2f5ff,[-1.3,1.2,.6],[-1.3,3.6,.6],.04);}
 if(key==='garen'){box(body,0xc1c8c9,0,2.4,.66,[1.15,1.05,.17]);box(body,0xd2b66a,0,2.38,.78,[.14,.8,.16]);box(body,0x284b91,0,2.1,-.69,[1.5,1.9,.14]);const sword=new THREE.Group();sword.position.set(1.25,1.92,.45);body.add(sword);box(sword,0xd5e2e5,0,1.05,.1,[.32,2.9,.14]);box(sword,0xd2b15f,0,-.12,.1,[1,.15,.25]);box(sword,0x644b37,0,-.45,.1,[.18,.5,.18]);sword.rotation.z=-.24;g.userData.sword=sword;const spin=part(g,geo('spinRing',()=>new THREE.RingGeometry(3.8,4.25,48)),0xe7c875,0,.3,0,[1,1,1],true);spin.rotation.x=-Math.PI/2;spin.visible=false;g.userData.spinRing=spin;}
 if(key==='lux'){cylinder(body,0xf0e6cf,0,1.5,0,1.12,1.3,.72);rod(body,0xd7bb65,[1.18,.65,.4],[1.18,4.25,.4],.1);ring(body,0xf9df8e,.45,4.18,.11).position.x=1.18;sphere(body,0xffee9a,1.18,4.2,.4,[.27,.35,.27],true);sphere(body,hair,-.45,3.25,-.27,[.22,.8,.35]);sphere(body,hair,.45,3.25,-.27,[.22,.8,.35]);}
 if(key==='ezreal'){box(body,0x405267,0,2.53,.73,[1.2,.38,.12]);box(body,0xbba374,-1.1,2,.45,[.65,.54,.62]);sphere(body,0x4ecaf3,-1.12,2,.85,[.28,.28,.2],true);box(body,0x493c2c,0,2.25,-.6,[1.1,1.05,.35]);box(body,0x987d4e,0,3.87,.5,[1.02,.23,.2]);}
 if(key==='yasuo'){
- sphere(body,skin,.18,2.6,.58,[.48,.58,.24]);
+ // Flatten the exposed chest against the tunic, with separate torso contours.
+ sphere(body,skin,.24,2.57,.755,[.34,.24,.065]);
+ sphere(body,skin,-.045,2.57,.735,[.18,.21,.055]);
+ sphere(body,skin,.19,2.27,.83,[.255,.2,.04]);
  for(let i=0;i<3;i++)box(body,0x8b9387,-1.02,2.83-i*.16,.05,[.88,.19,.96]);
  cylinder(body,0x28303a,0,4.05,-.18,.3,.55,.42);
  sphere(body,0x1a2432,0,4.5,-.35,[.34,.42,.32]);
@@ -79,7 +84,7 @@ if(type==='blue'||type==='red'){const glow=type==='blue'?0x4ed4ed:0xee6553;part(
 if(dragon){g.userData.wings=[];if(!materials.has('dragon-wing'))materials.set('dragon-wing',new THREE.MeshStandardMaterial({color:0x826144,side:THREE.DoubleSide,roughness:.8}));for(const s of [-1,1]){const shape=new THREE.Shape();shape.moveTo(0,0);shape.lineTo(s*9,5);shape.lineTo(s*7,-3);shape.lineTo(s*3,-1);shape.closePath();const w=new THREE.Mesh(geo(`dragonWing${s}`,()=>new THREE.ShapeGeometry(shape)),materials.get('dragon-wing'));w.position.set(s*2,4,-1);w.rotation.x=-.5;w.castShadow=true;g.add(w);g.userData.wings.push(w);rod(g,0xb6a07d,[s*2,4,-1],[s*9,6.5,-3.5],.15);}rod(g,c,[0,3,-3],[0,2,-8],1);}
 if(baron){for(let i=0;i<5;i++)rod(g,0x896492,[Math.sin(i)*2,5,0],[Math.sin(i)*3,8+i*.6,-1],.5);part(g,geo('horn',()=>new THREE.ConeGeometry(.6,2,6)),0xc3a1cb,0,7,4);}
 return g;}
-export function createActor(e){const g=e.kind==='hero'?applySkin(hero(e),e):['tower','nexus','inhibitor'].includes(e.kind)?structure(e):e.kind==='monster'?monster(e):e.kind==='ward'?ward(e):minion(e);g.position.set(e.x||0,0,e.z||0);g.userData.entityId=e.id;return g;}
+export function createActor(e){let g;if(e.kind==='hero'){g=hero(e);addHeroDetail(g,e,{sphere,box,cylinder,ring,rod,part,geo});applySkin(g,e);restoreFaceMaterials(g);}else g=['tower','nexus','inhibitor'].includes(e.kind)?structure(e):e.kind==='monster'?monster(e):e.kind==='ward'?ward(e):minion(e);g.position.set(e.x||0,0,e.z||0);g.userData.entityId=e.id;return g;}
 export function createHeroPreview(heroId,skinId='default'){
  const e={id:0,kind:'hero',team:'blue',heroId,skinId,x:0,z:0},g=createActor(e);optimizeHero(g,e);return g;
 }
@@ -89,15 +94,29 @@ function mergeStaticModel(group,e,directOnly=false){
  const key=[e.kind,e.team,e.heroId,e.skinId||'default',e.minionType,e.summonType,e.monsterType,directOnly].join(':'),dynamic=new Set([group.userData.crystal,...(group.userData.wheels||[]),...(group.userData.wings||[])]),parts=[];
  if(directOnly)parts.push(...group.children.filter(o=>o.isMesh&&!dynamic.has(o)));else group.traverse(o=>{if(o.isMesh&&!dynamic.has(o))parts.push(o);});
  let model=mergedModels.get(key);
- if(!model){group.updateMatrixWorld(true);const inverse=group.matrixWorld.clone().invert(),buckets=new Map();for(const object of parts){let geometry=object.geometry.index?object.geometry.toNonIndexed():object.geometry.clone();geometry.deleteAttribute('uv');geometry.applyMatrix4(new THREE.Matrix4().multiplyMatrices(inverse,object.matrixWorld));if(!buckets.has(object.material))buckets.set(object.material,[]);buckets.get(object.material).push(geometry);}model=[];for(const [material,list] of buckets){const geometry=mergeGeometries(list,false);list.forEach(g=>g.dispose());if(geometry)model.push({geometry,material});}mergedModels.set(key,model);}
+ if(!model){
+  group.updateMatrixWorld(true);const inverse=group.matrixWorld.clone().invert(),buckets=new Map();
+  for(const object of parts){
+   let geometry=object.geometry.index?object.geometry.toNonIndexed():object.geometry.clone();geometry.deleteAttribute('uv');geometry.applyMatrix4(new THREE.Matrix4().multiplyMatrices(inverse,object.matrixWorld));let material=object.material;
+   // Opaque hero colors share a small set of vertex-color materials. Facial detail,
+   // stitches and armor no longer add one draw call for every different paint color.
+   if(e.kind==='hero'&&material.isMeshStandardMaterial&&!material.transparent&&!(material.emissiveIntensity>.05)){
+    const metalness=Math.round(material.metalness*5)/5,roughness=Math.round(material.roughness*5)/5,materialKey=`${metalness}:${roughness}`;
+    if(!vertexMaterials.has(materialKey))vertexMaterials.set(materialKey,new THREE.MeshStandardMaterial({vertexColors:true,metalness,roughness}));
+    const colors=new Float32Array(geometry.attributes.position.count*3),color=material.color;for(let i=0;i<colors.length;i+=3){colors[i]=color.r;colors[i+1]=color.g;colors[i+2]=color.b;}geometry.setAttribute('color',new THREE.BufferAttribute(colors,3));material=vertexMaterials.get(materialKey);
+   }
+   if(!buckets.has(material))buckets.set(material,[]);buckets.get(material).push(geometry);
+  }
+  model=[];for(const[material,list]of buckets){const geometry=mergeGeometries(list,false);list.forEach(g=>g.dispose());if(geometry)model.push({geometry,material});}mergedModels.set(key,model);
+ }
  for(const object of parts)object.parent?.remove(object);
  for(const entry of model){const object=new THREE.Mesh(entry.geometry,entry.material);object.castShadow=true;object.receiveShadow=true;group.add(object);}
 }
 function optimizeHero(group,e){
  const modelEntity={...e,skinId:group.userData.skinId||'default'};
  mergeStaticModel(group.userData.body,modelEntity,true);
- const parts=[...(group.userData.braids||[]),...(group.userData.tails||[])];
- for(const [index,partGroup]of parts.entries())mergeStaticModel(partGroup,{...modelEntity,minionType:`appendage-${index}`});
+ const groups=[];const collect=(node,path)=>{for(const [index,child]of node.children.entries())if(child.isGroup){groups.push({group:child,path:`${path}:${index}`});collect(child,`${path}:${index}`);}};collect(group.userData.body,'body');
+ for(const {group:partGroup,path}of groups)if(partGroup.children.some(child=>child.isMesh))mergeStaticModel(partGroup,{...modelEntity,minionType:`animated-${path}`},true);
 }
 const MAGIC = {ahri:0x77efff,ashe:0x8eeaff,garen:0xffcf73,lux:0xffe59d,ezreal:0x55daff,yasuo:0xa8f3e5,teemo:0x9ee462,jinx:0xff77bc,annie:0xff8a57,brand:0xffae53,morgana:0xbc75ed,veigar:0xb27fff,ziggs:0xffc671,fizz:0x7ae8ee,masteryi:0x97f2b1,leesin:0xffd488,darius:0xf7736c,malphite:0xe0bd8b,blitzcrank:0x80edff,leona:0xffdd90,vayne:0xd8a6ff,caitlyn:0x90d9ff,missfortune:0xffb488,sona:0x7ce8d8};
 function missileColor(p){if(p.skinAccent)return p.skinAccent;return p.hero==='ahri'&&p.skill==='E'?0xff78bc:p.hero==='ahri'&&['W','R'].includes(p.skill)?0xbe8aff:p.hero==='jinx'&&p.rocket?0xffbb60:MAGIC[p.hero]||(p.team==='blue'?0x5bcee7:0xff7a8d);}
@@ -189,7 +208,7 @@ function createZone(zone){
  return group;
 }
 export class Actors {
- constructor(scene,labels){this.scene=scene;this.labels=labels;this.map=new Map();this.fx=[];this.projectiles=new Map();this.zones=new Map();this._projection=new THREE.Vector3();this.effects=new CombatEffects(scene);this.visualTime=0;this.active=false;}
+ constructor(scene,labels){this.scene=scene;this.labels=labels;this.map=new Map();this.fx=[];this.projectiles=new Map();this.zones=new Map();this._projection=new THREE.Vector3();this.effects=new CombatEffects(scene);this.effects.setEntityResolver?.(id=>this.game?.getEntity?.(id),entity=>!this.active||!this.game?.isVisible||this.game.isVisible(entity));this.visualTime=0;this.active=false;}
  clear(){
   for(const {mesh,label} of this.map.values()){this.scene.remove(mesh);mesh.userData.shield?.material.dispose();label?.remove();}this.map.clear();
   for(const mesh of this.projectiles.values()){this.scene.remove(mesh);disposeOwned(mesh);}this.projectiles.clear();
@@ -236,7 +255,7 @@ export class Actors {
      }
     }
     if(data.rocket)data.rocket.visible=!!e.rocketMode;
-    if(data.shield){data.shield.visible=e.shield>0&&e.shieldUntil>game.time;data.shield.material.opacity=.12+Math.sin(time*4)*.025;}
+    if(data.shield){data.shield.visible=e.shield>0&&e.shieldUntil>game.time||e.barrierHp>0&&e.barrierUntil>game.time;data.shield.material.opacity=.12+Math.sin(time*4)*.025;}
     if(dt>0&&active){
      a.statusAge+=dt;if(a.statusAge>.08){a.statusAge=0;
       if(spinning){this.effects.trail(e.x+Math.sin(time*18)*4.4,.8,e.z+Math.cos(time*18)*4.4,0xffd16c,.9,4,.4);}
@@ -282,6 +301,7 @@ export class Actors {
  event(e){
   const x=e.x??e.toX??0,z=e.z??e.toZ??0,source=this.game?.getEntity?.(e.source),hero=e.hero||e.heroId||source?.heroId,skin=getSkin(source?.skinId),c=skin&&skin.championId===hero?skin.accent:e.color||(e.team==='red'?0xff6078:0x74e9ff),liveMissiles=Array.isArray(this.game?.projectiles);
   if(!this.eventVisible(e,x,z))return;
+  if(this.effects.summonerEvent?.(e,source,this.game?.getEntity?.(e.target)))return;
   const from=new THREE.Vector3(e.fromX??source?.x??x,2.5,e.fromZ??source?.z??z),to=new THREE.Vector3(e.toX??x,2.5,e.toZ??z),fx=this.effects;
   if(e.type==='damage'){this.floating(x,z,Math.round(e.amount||0),e.team==='blue'?'#ffe9b9':'#ff8b8b');fx.burst(x,1.8,z,c,8,4,.32);}
   if(e.type==='gold')this.floating(x,z,`+${e.amount||0} 金币`,'#e8c775');

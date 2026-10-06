@@ -53,10 +53,18 @@
         <div class="roster-toolbar"><label class="roster-search"><svg><use href="#i-eye"/></svg><input id="hero-search" placeholder="搜索英雄、技能或玩法" aria-label="搜索英雄" autocomplete="off"></label><nav id="hero-filters" class="hero-filters" aria-label="英雄分类"><button data-role="all" class="active">全部</button><button data-role="owned">已拥有</button><button data-role="战士">战士</button><button data-role="法师">法师</button><button data-role="射手">射手</button><button data-role="坦克">坦克</button><button data-role="辅助">辅助</button></nav></div>
         <div id="hero-grid" class="hero-grid"></div>
         <div class="selected-hero-details collection-details">
-          <div class="skin-preview"><canvas id="hero-preview" aria-label="英雄皮肤 3D 预览，可拖动旋转"></canvas><span class="preview-caption">3D 外观 · 拖动旋转</span><span id="preview-theme" class="preview-theme">经典外观</span></div>
+          <div class="skin-preview"><canvas id="hero-preview" aria-label="英雄皮肤 3D 预览，可拖动旋转和滚轮缩放"></canvas><span class="preview-caption">3D 外观 · 拖动旋转 · 滚轮缩放</span><span id="preview-theme" class="preview-theme">经典外观</span><button id="preview-expand" class="preview-expand" aria-haspopup="dialog">放大模型</button></div>
           <div class="hero-detail-content"><div class="detail-title"><h3 id="hero-title">阿狸</h3><span id="hero-ownership" class="ownership-tag">已拥有</span></div><p id="hero-description"></p><p id="hero-combo" class="hero-combo"></p><p id="hero-passive" class="hero-passive"></p><div id="hero-skills-preview" class="hero-skills-preview"></div><p id="hero-skill-description" class="hero-skill-description"></p><button id="unlock-hero" class="unlock-button hidden"></button><div class="skin-section"><div class="skin-section-heading"><h4>英雄衣橱</h4><span>外观不影响属性</span></div><div id="skin-options" class="skin-options"></div><p id="skin-description"></p><button id="skin-action" class="skin-action hidden"></button></div></div>
         </div>
       </div>
+
+      <section class="summoner-loadout" aria-label="配置召唤师技能">
+        <div class="selection-heading"><span class="section-index">02</span><h2>召唤师技能</h2><span class="selection-hint">选择两个技能 · 免费使用</span></div>
+        <div class="summoner-config">
+          <div id="summoner-slots" class="summoner-loadout-slots" aria-label="召唤师技能按键"></div>
+          <div class="summoner-catalog-wrap"><div id="summoner-catalog" class="summoner-catalog" aria-label="可选召唤师技能"></div><p id="summoner-detail" class="summoner-detail" aria-live="polite"></p></div>
+        </div>
+      </section>
 
       <footer class="lobby-footer">
         <label class="practice-option"><input id="practice-toggle" type="checkbox" /><span class="custom-check"></span><span>练习模式<small>所有英雄免费试用 · 不获精粹</small></span></label>
@@ -67,6 +75,12 @@
       <div class="lobby-bottom-note">新玩家赠送 6,000 精粹 · 对战与每日补给获取更多 · 收藏保存在当前浏览器</div>
       <details class="essence-rules"><summary>如何获取蓝色精粹？</summary><p>每日补给 +1,200。普通对局每分钟 +60、每次补刀 +2、击杀 +30、助攻 +15，战斗奖励每局最多 1,200；结束后胜利额外 +1,500，失败 +900。练习模式免费试用英雄，不发放精粹。</p></details>
     </section>
+
+    <dialog id="model-inspector" class="model-inspector" aria-labelledby="model-inspector-title">
+      <header><div><span class="eyebrow">CHAMPION SHOWCASE</span><h2 id="model-inspector-title">英雄模型</h2></div><button id="model-inspector-close" class="icon-button close-button" aria-label="关闭模型预览"><svg><use href="#i-close"/></svg></button></header>
+      <div id="model-inspector-stage" class="model-inspector-stage"></div>
+      <footer><span>拖动旋转 · 缩放查看细节</span><div class="model-preview-controls"><button id="model-zoom-out" aria-label="缩小模型">−</button><button id="model-zoom-in" aria-label="放大模型">＋</button><button id="model-inspector-reset">重置</button></div></footer>
+    </dialog>
 
     <div id="hud" class="hidden">
       <header class="match-topbar">
@@ -87,6 +101,7 @@
       <div id="event-feed" class="event-feed" aria-live="polite"></div>
 
       <div id="target-panel" class="target-panel hidden"><div class="target-eyebrow">当前目标</div><strong id="target-name">敌方目标</strong><div class="target-health"><div id="target-hp-fill"></div></div></div>
+      <div id="channel-feedback" class="channel-feedback hidden" role="status"><span id="channel-text">传送中</span><div><i id="channel-progress"></i></div><small>移动或施放技能会取消</small></div>
 
       <div class="battle-hud">
         <div class="hero-status">
@@ -122,7 +137,7 @@
     </section>
 
     <section id="help-panel" class="overlay modal-overlay hidden" aria-label="游戏操作指南">
-      <div class="help-window modal-window"><header class="modal-heading"><div><span class="eyebrow">FIELD GUIDE</span><h2>峡谷作战手册</h2></div><button id="help-close" class="icon-button close-button" aria-label="关闭操作指南"><svg><use href="#i-close"/></svg></button></header><div class="help-content"><div class="help-column"><h3>移动与战斗</h3><dl><div><dt><kbd>鼠标右键</kbd></dt><dd>点击地面移动，点击敌人持续攻击</dd></div><div><dt><kbd>Q</kbd><kbd>W</kbd><kbd>E</kbd><kbd>R</kbd></dt><dd>手动：按键瞄准再左键施放；智能：按键立即朝鼠标施放。大厅、暂停菜单或右上角可切换</dd></div><div><dt><kbd>Shift + 技能</kbd></dt><dd>临时使用另一种施法：手动模式下快速施放，智能模式下手动瞄准</dd></div><div><dt><kbd>Ctrl + 技能</kbd></dt><dd>消耗技能点，升级对应技能</dd></div><div><dt><kbd>D</kbd></dt><dd>闪现，遵循当前施法模式确认落点</dd></div><div><dt><kbd>F</kbd></dt><dd>引燃，遵循当前施法模式选择鼠标处的敌方英雄</dd></div><div><dt><kbd>A</kbd></dt><dd>左键点敌人精准攻击；点地面沿途攻击。Shift+A 立即执行</dd></div><div><dt><kbd>S</kbd></dt><dd>停止移动与攻击</dd></div><div><dt><kbd>B</kbd></dt><dd>引导回城，受到伤害会打断</dd></div></dl><h3>视野与视角</h3><dl><div><dt><kbd>4</kbd></dt><dd>放置侦查守卫，遵循当前施法模式选择落点</dd></div><div><dt><kbd>空格</kbd></dt><dd>按住将视角移至当前英雄</dd></div><div><dt><kbd>Y</kbd></dt><dd>切换英雄跟随与自由视角</dd></div><div><dt><kbd>滚轮</kbd></dt><dd>拉近或拉远镜头</dd></div><div><dt><kbd>鼠标中键拖动</kbd></dt><dd>按住滚轮拖动镜头；空白地面也可左键拖动</dd></div><div><dt><kbd>方向键</kbd></dt><dd>快速平移镜头</dd></div><div><dt><kbd>屏幕边缘</kbd></dt><dd>快速平移镜头，自动进入自由视角</dd></div></dl></div><div class="help-column"><h3>装备与战况</h3><dl><div><dt><kbd>P</kbd></dt><dd>打开商店，在泉水购买、合成与出售；阵亡时也可操作</dd></div><div><dt><kbd>1</kbd><kbd>2</kbd><kbd>3</kbd><kbd>5</kbd><kbd>6</kbd><kbd>7</kbd></dt><dd>使用对应装备栏的主动效果</dd></div><div><dt><kbd>Tab</kbd></dt><dd>按住查看双方战况</dd></div><div><dt><kbd>Esc</kbd></dt><dd>取消瞄准、关闭窗口或暂停</dd></div></dl><div class="strategy-note"><b>合成与出售</b><p>已有散件自动抵扣成装价格。商店里点击“我的装备”栏位，再点击出售按钮返还金币。</p></div><h3>赢得这场战斗</h3><div class="strategy-note"><b>补刀发育</b><p>对小兵打出最后一击，获得金币和补刀数；击杀附近敌人积累经验。</p></div><div class="strategy-note"><b>兵线推塔</b><p>跟随己方小兵推进。先拆除防御塔与召唤水晶，再摧毁敌方主水晶。</p></div><div class="strategy-note"><b>掌控野区</b><p>草丛能够隐藏敌人。插眼侦查，争夺巨龙与纳什男爵，取得战场优势。</p></div><div class="mobile-help"><b>触屏操作</b><p>点按地面移动，点按敌人攻击；点击技能后，再点战场选择目标。点击小地图快速定位。</p></div></div></div><footer class="help-footer">了解你选择的英雄：悬停技能图标可查看技能说明。</footer></div>
+      <div class="help-window modal-window"><header class="modal-heading"><div><span class="eyebrow">FIELD GUIDE</span><h2>峡谷作战手册</h2></div><button id="help-close" class="icon-button close-button" aria-label="关闭操作指南"><svg><use href="#i-close"/></svg></button></header><div class="help-content"><div class="help-column"><h3>移动与战斗</h3><dl><div><dt><kbd>鼠标右键</kbd></dt><dd>点击地面移动，点击敌人持续攻击</dd></div><div><dt><kbd>Q</kbd><kbd>W</kbd><kbd>E</kbd><kbd>R</kbd></dt><dd>手动：按键瞄准再左键施放；智能：按键立即朝鼠标施放。大厅、暂停菜单或右上角可切换</dd></div><div><dt><kbd>Shift + 技能</kbd></dt><dd>临时使用另一种施法：手动模式下快速施放，智能模式下手动瞄准</dd></div><div><dt><kbd>Ctrl + 技能</kbd></dt><dd>消耗技能点，升级对应技能</dd></div><div><dt><kbd>D</kbd></dt><dd>施放 D 栏召唤师技能，进入对局前在大厅选择</dd></div><div><dt><kbd>F</kbd></dt><dd>施放 F 栏召唤师技能；自身技能直接生效，目标技能遵循施法模式</dd></div><div><dt><kbd>A</kbd></dt><dd>左键点敌人精准攻击；点地面沿途攻击。Shift+A 立即执行</dd></div><div><dt><kbd>S</kbd></dt><dd>停止移动与攻击</dd></div><div><dt><kbd>B</kbd></dt><dd>引导回城，受到伤害会打断</dd></div></dl><h3>视野与视角</h3><dl><div><dt><kbd>4</kbd></dt><dd>放置侦查守卫，遵循当前施法模式选择落点</dd></div><div><dt><kbd>空格</kbd></dt><dd>按住将视角移至当前英雄</dd></div><div><dt><kbd>Y</kbd></dt><dd>切换英雄跟随与自由视角</dd></div><div><dt><kbd>滚轮</kbd></dt><dd>拉近或拉远镜头</dd></div><div><dt><kbd>鼠标中键拖动</kbd></dt><dd>按住滚轮拖动镜头；空白地面也可左键拖动</dd></div><div><dt><kbd>方向键</kbd></dt><dd>快速平移镜头</dd></div><div><dt><kbd>屏幕边缘</kbd></dt><dd>快速平移镜头，自动进入自由视角</dd></div></dl></div><div class="help-column"><h3>装备与战况</h3><dl><div><dt><kbd>P</kbd></dt><dd>打开商店，在泉水购买、合成与出售；阵亡时也可操作</dd></div><div><dt><kbd>1</kbd><kbd>2</kbd><kbd>3</kbd><kbd>5</kbd><kbd>6</kbd><kbd>7</kbd></dt><dd>使用对应装备栏的主动效果</dd></div><div><dt><kbd>Tab</kbd></dt><dd>按住查看双方战况</dd></div><div><dt><kbd>Esc</kbd></dt><dd>取消瞄准、关闭窗口或暂停</dd></div></dl><div class="strategy-note"><b>合成与出售</b><p>已有散件自动抵扣成装价格。商店里点击“我的装备”栏位，再点击出售按钮返还金币。</p></div><div class="strategy-note"><b>召唤师技能</b><p>大厅配置两个不同的技能，默认闪现与引燃。传送需选己方塔、兵或守卫，也可在小地图上选择；引导时移动或施法会取消。惩戒可打野怪与敌方小兵。净化能在受控时使用，但不能移除击飞。</p></div><h3>赢得这场战斗</h3><div class="strategy-note"><b>补刀发育</b><p>对小兵打出最后一击，获得金币和补刀数；击杀附近敌人积累经验。</p></div><div class="strategy-note"><b>兵线推塔</b><p>跟随己方小兵推进。先拆除防御塔与召唤水晶，再摧毁敌方主水晶。</p></div><div class="strategy-note"><b>掌控野区</b><p>草丛能够隐藏敌人。插眼侦查，争夺巨龙与纳什男爵，取得战场优势。</p></div><div class="mobile-help"><b>触屏操作</b><p>点按地面移动，点按敌人攻击；点击技能后，再点战场选择目标。点击小地图快速定位。</p></div></div></div><footer class="help-footer">了解你选择的英雄：悬停技能图标可查看技能说明。</footer></div>
     </section>
 
     <section id="pause-panel" class="overlay modal-overlay hidden" aria-label="游戏已暂停"><div class="pause-window modal-window"><div class="pause-rune">Ⅱ</div><span class="eyebrow">TAKE A BREATH</span><h2>战场已暂停</h2><p>稍作调整，准备下一次出击。</p><label class="cast-setting pause-cast-setting">施法方式<select id="pause-cast-mode" data-cast-selector aria-label="暂停菜单施法方式"><option value="manual">手动施法</option><option value="smart">智能施法</option></select><small>Shift + 技能临时使用另一种施法</small></label><button id="resume-button" class="primary-button">继续战斗<svg><use href="#i-play"/></svg></button><button id="restart-button" class="secondary-button">重新开始</button><button id="lobby-button" class="text-button">返回英雄选择</button><small><kbd>Esc</kbd> 继续游戏</small></div></section>

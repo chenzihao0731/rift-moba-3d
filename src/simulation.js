@@ -5,6 +5,8 @@ export { CHAMPIONS, ITEMS };
 import { Navigation } from './navigation.js';
 import { isExtended, extendedInit, extendedRecast, extendedValidate, extendedCast, extendedProjectileHit, extendedProjectileEnd, extendedZoneUpdate, cancelExtendedChannel, extendedHeroUpdate, extendedAttackSpeed, extendedMoveSpeed, extendedAttackAmount, extendedAttackHit, extendedAnyAttackHit, extendedDamageAmount, extendedAfterDamage, extendedKill, extendedDeath, extendedSummonUpdate, extendedAI } from './champion-abilities.js';
 import { recomputeEquipmentStats, equipmentOnCast, equipmentOnAttack, equipmentDamage, equipmentStatusUpdate, equipmentUpdate, equipmentHealingMultiplier, useEquipment } from './equipment-effects.js';
+import { SUMMONER_SPELLS, getSummonerSpell, normalizeSummoners, aiSummonerLoadout, castSummoner, cancelSummonerChannel, updateSummoner, resetSummonerState, summonerMoveMultiplier, summonerDamageAmount, absorbSummonerBarrier, updateSummonerAI } from './summoner-spells.js';
+export { SUMMONER_SPELLS, getSummonerSpell, normalizeSummoners };
 // The match runs entirely in map coordinates; rendering is deliberately independent.
 const P = (x, z) => ({ x, z });
 export const LANES = {
@@ -30,8 +32,9 @@ const LANE_LENGTH = Object.fromEntries(Object.entries(LANES).map(([k,p])=>[k,pat
 function pathPoint(lane,t){const points=LANES[lane];let left=clamp(t,0,1)*LANE_LENGTH[lane];for(let i=1;i<points.length;i++){const l=distance(points[i-1],points[i]);if(left<=l)return P(points[i-1].x+(points[i].x-points[i-1].x)*left/l,points[i-1].z+(points[i].z-points[i-1].z)*left/l);left-=l;}return {...points.at(-1)};}
 
 export class Game {
-  constructor({hero='ahri',practice=false}={}){this.practice=practice;this.restart(hero);}
-  restart(heroId=this.player?.heroId||'ahri'){
+  constructor({hero='ahri',practice=false,summoners}={}){this.practice=practice;this.summoners=normalizeSummoners(summoners);this.restart(hero);}
+  restart(heroId=this.player?.heroId||'ahri',summoners=this.player?.summoners||this.summoners){
+    this.summoners=normalizeSummoners(summoners);
     this.time=0;this.winner=null;this.entities=[];this.projectiles=[];this.zones=[];this.reveals=[];this.events=[];this.score={blue:0,red:0};this._id=0;this._wave=0;this._nextWave=5;this._tick=.5;
     this.player=this._hero(CHAMP[heroId]?heroId:'ahri','blue','mid',true);
     const pools={top:['garen','yasuo','darius','malphite'],mid:['ahri','lux','annie','brand','morgana','veigar','ziggs','fizz'],carry:['ashe','ezreal','jinx','vayne','caitlyn','missfortune'],support:['lux','leona','blitzcrank','sona','morgana'],jungle:['teemo','masteryi','leesin','fizz']};
@@ -69,13 +72,13 @@ export class Game {
     const c=CHAMP[heroId],base=BASE[team],sign=team==='blue'?1:-1,index=this.entities.filter(e=>e.kind==='hero'&&e.team===team).length;
     const offsets=[[-8,8],[-13,3],[-3,13],[-13,10],[-10,13]][index%5],spawnX=base.x+offsets[0]*sign,spawnZ=base.z+offsets[1]*sign;
     const h=this._entity({kind:'hero',heroId,team,name:c.name,x:spawnX,z:spawnZ,hp:c.hp,maxHp:c.hp,mana:c.mana,maxMana:c.mana,baseHp:c.hp,baseMana:c.mana,baseAttack:c.attack,baseArmor:c.armor,baseMagicResist:30,baseSpeed:c.speed,attack:c.attack,armor:c.armor,magicResist:30,attackRange:c.attackRange,speed:c.speed,ap:0,haste:0,attackSpeed:.75,crit:0,critPower:0,lifesteal:0,manaRegen:0,level:1,xp:0,xpToNext:120,gold:player?500:450,kills:0,deaths:0,assists:0,cs:0,inventory:Array(6).fill(null),cooldowns:{Q:0,W:0,E:0,R:0,D:0,F:0,4:0},skillRanks:{Q:1,W:0,E:0,R:0},skillPoints:0,lane,isPlayer:player,radius:1.8,wardCharges:2,wardTimer:0,contributors:{},command:player?{type:'stop'}:{type:'ai'},aiThink:0,aiAggression:.6+Math.random()*.3,spawnX,spawnZ,flow:0,qStacks:0,dashLocks:{},shroomCharges:0,shroomRecharge:0,rocketMode:false,minigunStacks:0});
-    h.skillLevels=h.skillRanks;extendedInit(h);return h;
+    h.skillLevels=h.skillRanks;h.summoners=normalizeSummoners(player?this.summoners:aiSummonerLoadout(heroId,lane));extendedInit(h);return h;
   }
   _monster(type,x,z,hp,attack,respawnTime,reward,name){const available=type==='baron'?180:type==='dragon'?35:0;return this._entity({kind:'monster',monsterType:type,team:'neutral',x,z,homeX:x,homeZ:z,hp,maxHp:hp,attack,armor:type==='baron'?50:15,magicResist:15,attackRange:6,speed:6,radius:type==='baron'?5:type==='dragon'?4:2.6,respawnTime,reward,name,alive:available===0||this.practice,respawnAt:available,attackCooldown:0});}
   setPractice(enabled){this.practice=!!enabled;if(enabled&&this.player.gold<5000)this.player.gold=5000;}
   _event(type,data={}){this.events.push({type,time:this.time,...data});if(this.events.length>500)this.events.splice(0,150);}
   getEntity(id){return this.entities.find(e=>e.id===id);}
-  moveTo(x,z){if(!this.player.alive)return;this._cancelRecall(this.player);cancelExtendedChannel(this,this.player);const p={x:clamp(x,-119,119),z:clamp(z,-119,119)},destination=this.navigation?this.navigation.nearestPoint(p):p;this.player._route=null;this.player.command={type:'move',...destination};}
+  moveTo(x,z){if(!this.player.alive)return;this._cancelRecall(this.player);this._cancelChannels(this.player);const p={x:clamp(x,-119,119),z:clamp(z,-119,119)},destination=this.navigation?this.navigation.nearestPoint(p):p;this.player._route=null;this.player.command={type:'move',...destination};}
   attackMoveTo(x,z,targetId){
     if(!this.player.alive)return false;
     // Clicking an enemy is an explicit attack, including neutral camps and revealed wards.
@@ -83,10 +86,11 @@ export class Game {
     this.moveTo(x,z);this.player.command={...this.player.command,type:'attackMove',cursorX:clamp(x,-119,119),cursorZ:clamp(z,-119,119),targetId:0};return true;
   }
   attackMove(x,z,targetId){return this.attackMoveTo(x,z,targetId);}
-  attackTarget(id){const t=this.getEntity(id);if(!this.player.alive||!this._canAttackTarget(this.player,t))return false;this._cancelRecall(this.player);cancelExtendedChannel(this,this.player);this.player._route=null;this.player.command={type:'attack',targetId:id};return true;}
-  stop(){this._cancelRecall(this.player);cancelExtendedChannel(this,this.player);this.player._route=null;this.player.command={type:'stop'};}
-  recall(){const h=this.player;if(!h.alive||this.winner)return false;cancelExtendedChannel(this,h);h.command={type:'stop'};h.recallAt=this.time+(this.practice?2:6);this._event('recall',{x:h.x,z:h.z,team:h.team,source:h.id,text:'正在回城'});return true;}
+  attackTarget(id){const t=this.getEntity(id);if(!this.player.alive||!this._canAttackTarget(this.player,t))return false;this._cancelRecall(this.player);this._cancelChannels(this.player);this.player._route=null;this.player.command={type:'attack',targetId:id};return true;}
+  stop(){this._cancelRecall(this.player);this._cancelChannels(this.player);this.player._route=null;this.player.command={type:'stop'};}
+  recall(){const h=this.player;if(!h.alive||this.winner)return false;this._cancelChannels(h);h.command={type:'stop'};h.recallAt=this.time+(this.practice?2:6);this._event('recall',{x:h.x,z:h.z,team:h.team,source:h.id,text:'正在回城'});return true;}
   _cancelRecall(h){h.recallAt=0;}
+  _cancelChannels(h){cancelExtendedChannel(this,h);cancelSummonerChannel(this,h);}
   _nearBase(h){return distance(h,BASE[h.team])<20;}
   canShop(h=this.player){return this.practice||!h.alive||this._nearBase(h);}
   quoteBuy(itemId){return purchaseQuote(this.player,itemId,{canShop:this.canShop()});}
@@ -98,10 +102,10 @@ export class Game {
   _learn(h,key){if(!['Q','W','E','R'].includes(key))return false;if(h.skillPoints<=0)return this._fail(h,'没有可用的技能点');const rank=h.skillLevels[key]||0,max=key==='R'?3:5;if(rank>=max)return this._fail(h,'技能已经升到最高等级');const required=key==='R'?[6,11,16][rank]:rank*2+1;if(h.level<required)return this._fail(h,`此技能升级需要英雄达到 ${required} 级`);h.skillLevels[key]=rank+1;h.skillPoints--;if(h.heroId==='teemo'&&key==='R'&&!rank)h.shroomCharges=3;if(h.isPlayer)this._event('message',{text:`${CHAMP[h.heroId].skills.find(s=>s.key===key).name} 升至 ${rank+1} 级`});return true;}
   useItem(index,x=this.player.x,z=this.player.z){const h=this.player,slot=h.inventory[index],item=ITEM[slot?.id];if(!h.alive||!item?.active||slot.cooldown>0)return false;if(item.active==='stasis'){h.invulnerableUntil=this.time+2.5;h.stunUntil=this.time+2.5;slot.cooldown=90;this._event('spell',{x:h.x,z:h.z,source:h.id,hero:h.heroId,key:'ZHONYA',radius:3,color:'#ffd363'});}
     if(item.active==='heal'){h.potionUntil=this.time+6;this._consume(h,index);this._event('message',{text:'生命药水：持续恢复生命'});}
-    if(item.active==='ward'){if(distance(h,{x,z})>25){this._event('message',{text:'守卫放置距离过远'});return false;}this._addWard(h,x,z,true);this._consume(h,index);}if(!['stasis','heal','ward'].includes(item.active))return useEquipment(this,h,slot,item,x,z);return true;}
+    if(item.active==='ward'){if(distance(h,{x,z})>25){this._event('message',{text:'守卫放置距离过远'});return false;}this._addWard(h,x,z,true);this._consume(h,index);}if(!['stasis','heal','ward'].includes(item.active)){const used=useEquipment(this,h,slot,item,x,z);if(used)this._cancelChannels(h);return used;}this._cancelChannels(h);return true;}
   _consume(h,index){const s=h.inventory[index];if(s.count>1)s.count--;else h.inventory[index]=null;}
   _recomputeStats(h){let stats={hp:0,mana:0,attack:0,armor:0,ap:0,speed:0,haste:0,attackSpeed:0,lifesteal:0,crit:0,critPower:0,manaRegen:0,apMultiplier:0};for(const slot of h.inventory)for(const[k,v]of Object.entries(ITEM[slot?.id]?.stats||{}))stats[k]=(stats[k]||0)+v;h.maxHp=h.baseHp+(h.level-1)*85+stats.hp;h.maxMana=h.baseMana? h.baseMana+(h.level-1)*35+stats.mana:0;h.attack=h.baseAttack+(h.level-1)*4+stats.attack+(h.dragonStacks||0)*6;h.armor=h.baseArmor+(h.level-1)*3.5+stats.armor;h.magicResist=h.baseMagicResist+(h.level-1)*1.5;h.ap=(stats.ap+(h.dragonStacks||0)*10+(h.ext?.veigarAp||0))*(1+stats.apMultiplier);h.speed=h.baseSpeed+Math.min(stats.speed,5);h.attackSpeed=.75*(1+(h.level-1)*.025+stats.attackSpeed);for(const key of ['haste','lifesteal','crit','critPower','manaRegen'])h[key]=stats[key];h.hp=Math.min(h.maxHp,h.hp);h.mana=Math.min(h.maxMana,h.mana);if(h.heroId==='yasuo')h.crit=Math.min(1,h.crit*2);h.attackRange=CHAMP[h.heroId].attackRange+(h.heroId==='jinx'&&h.rocketMode?6+(h.skillLevels.Q||1):0);recomputeEquipmentStats(h,stats,this.time);}
-  placeWard(x,z){const h=this.player;if(!h.alive||h.cooldowns[4]>0)return false;if(h.wardCharges<=0){this._event('message',{text:'侦查守卫正在充能'});return false;}if(distance(h,{x,z})>25){const d=distance(h,{x,z});x=h.x+(x-h.x)*25/d;z=h.z+(z-h.z)*25/d;}h.wardCharges--;h.cooldowns[4]=.8;this._addWard(h,x,z,false);return true;}
+  placeWard(x,z){const h=this.player;if(!h.alive||h.cooldowns[4]>0)return false;if(h.wardCharges<=0){this._event('message',{text:'侦查守卫正在充能'});return false;}if(distance(h,{x,z})>25){const d=distance(h,{x,z});x=h.x+(x-h.x)*25/d;z=h.z+(z-h.z)*25/d;}this._cancelChannels(h);h.wardCharges--;h.cooldowns[4]=.8;this._addWard(h,x,z,false);return true;}
   _addWard(h,x,z,control){const wards=this.entities.filter(e=>e.kind==='ward'&&e.sourceId===h.id&&e.alive&&!e.control);if(wards.length>=3)wards[0].alive=false;const e=this._entity({kind:'ward',team:h.team,x:clamp(x,-119,119),z:clamp(z,-119,119),hp:3,maxHp:3,radius:1,sourceId:h.id,control,expiresAt:this.time+(control?150:90),visionRange:control?26:23,name:control?'控制守卫':'侦查守卫'});this._event('ward',{x:e.x,z:e.z,source:h.id,team:h.team,text:control?'控制守卫已部署':'侦查守卫已部署',radius:e.visionRange});}
   isVisible(e,team='blue'){
     if(!e?.alive)return e?.kind==='hero'&&e.team===team;
@@ -136,16 +140,12 @@ export class Game {
   _excite(h){if(h?.heroId!=='jinx'||!h.alive)return;h.excitedUntil=this.time+6;this._event('spell',{hero:'jinx',key:'EXCITED',source:h.id,team:h.team,x:h.x,z:h.z,radius:5,color:'#f4a2d4'});}
   cast(key,x=this.player.x,z=this.player.z,targetId){return this._cast(this.player,String(key).toUpperCase(),x,z,targetId);}
   _cast(h,key,x,z,targetId){
-    if(!h.alive)return this._fail(h,'英雄阵亡，等待复活');if(this.winner)return false;if(h.stunUntil>this.time||h.airborneUntil>this.time||h.invulnerableUntil>this.time)return this._fail(h,'受到控制，暂时无法施放技能');
+    if(!h.alive)return this._fail(h,'英雄阵亡，等待复活');if(this.winner)return false;if(['D','F'].includes(key))return castSummoner(this,h,key,x,z,targetId);if(h.stunUntil>this.time||h.airborneUntil>this.time||h.invulnerableUntil>this.time)return this._fail(h,'受到控制，暂时无法施放技能');
     if(key==='4')return h.isPlayer?this.placeWard(x,z):false;
-    if(key==='E'&&h.heroId==='lux'&&h.lightZone){this._detonate(h.lightZone);h.lightZone=null;return true;}
+    if(key==='E'&&h.heroId==='lux'&&h.lightZone){this._cancelChannels(h);this._detonate(h.lightZone);h.lightZone=null;return true;}
     const isRecast=key==='R'&&h.heroId==='ahri'&&h.dashCharges>0&&h.dashUntil>this.time||extendedRecast(this,h,key);
     if((h.cooldowns[key]||0)>0&&!isRecast)return this._fail(h,`${key} 冷却中：${Math.ceil(h.cooldowns[key])} 秒`);
     if(h.silenceUntil>this.time&&!['D','F'].includes(key))return this._fail(h,'受到沉默，无法施放技能');
-    if(key==='D'){
-      this._cancelRecall(h);cancelExtendedChannel(this,h);const from=P(h.x,h.z);this._dash(h,x,z,20);h.cooldowns.D=this.practice?12:300;this._event('spell',{hero:h.heroId,key:'D',source:h.id,team:h.team,x:h.x,z:h.z,fromX:from.x,fromZ:from.z,toX:h.x,toZ:h.z,color:'#ffe59a',radius:3});return true;
-    }
-    if(key==='F'){const t=this.getEntity(targetId)||this._nearest({x,z,team:h.team},18,e=>e.kind==='hero');if(!t||t.team===h.team||t.kind!=='hero'||distance(h,t)>24)return this._fail(h,'引燃需要射程内的敌方英雄');h.cooldowns.F=this.practice?12:180;t.igniteUntil=this.time+5;t.igniteDamage=(90+20*h.level)/5;t.igniteSource=h.id;t.igniteTick=this.time;this._event('spell',{source:h.id,target:t.id,hero:h.heroId,key,team:h.team,fromX:h.x,fromZ:h.z,toX:t.x,toZ:t.z,x:t.x,z:t.z,color:'#f77932'});return true;}
     const skill=CHAMP[h.heroId].skills.find(s=>s.key===key);if(!skill)return false;
     if(key==='R'&&h.level<6){if(h.isPlayer)this._event('message',{text:'终极技能在英雄达到 6 级后解锁'});return false;}
     if(!h.skillLevels[key])return this._fail(h,`${key} 尚未学习，请点击技能上的 + 号`);
@@ -158,7 +158,7 @@ export class Game {
     if(h.heroId==='yasuo'&&key==='E'){target=target||this._nearest({x,z,team:h.team},10,e=>!isStructure(e),true);if(!target||isStructure(target)||distance(h,target)>18+target.radius||!this.isVisible(target,h.team))return this._fail(h,'踏前斩需要附近的可见敌人');if((h.dashLocks[target.id]||0)>this.time)return this._fail(h,'这个目标暂时不能再次穿越');}
     if(h.heroId==='yasuo'&&key==='R'){if(target&&!this.isVisible(target,h.team))return this._fail(h,'狂风绝息斩需要可见的击飞目标');if(!target||target.kind!=='hero'||!(target.airborneUntil>this.time))target=this._nearest(h,62,e=>e.kind==='hero'&&e.airborneUntil>this.time);if(!target||distance(h,target)>62||!(target.airborneUntil>this.time)||!this.isVisible(target,h.team))return this._fail(h,'狂风绝息斩需要被击飞的敌方英雄');}
     if(h.heroId==='garen'&&key==='R'){target=target||this._nearest({x,z,team:h.team},15,e=>e.kind==='hero');if(!target||target.kind!=='hero'||distance(h,target)>17){if(h.isPlayer)this._event('message',{text:'德玛西亚正义需要附近的敌方英雄'});return false;}}
-    this._cancelRecall(h);cancelExtendedChannel(this,h);this._breakStealth(h);h.mana=Math.max(0,h.mana-cost);if(!isRecast)h.cooldowns[key]=skill.cooldown/(1+h.haste/100);h.lastCastAt=this.time;if(h.heroId==='yasuo'&&key==='Q')h.cooldowns.Q=Math.max(1.1,skill.cooldown/(1+(h.attackSpeed/.75-1)*1.1));
+    this._cancelRecall(h);this._cancelChannels(h);this._breakStealth(h);h.mana=Math.max(0,h.mana-cost);if(!isRecast)h.cooldowns[key]=skill.cooldown/(1+h.haste/100);h.lastCastAt=this.time;if(h.heroId==='yasuo'&&key==='Q')h.cooldowns.Q=Math.max(1.1,skill.cooldown/(1+(h.attackSpeed/.75-1)*1.1));
     const d=Math.hypot(x-h.x,z-h.z)||1,dir=P((x-h.x)/d,(z-h.z)/d),ap=h.ap+(h.baronUntil>this.time?35:0),rank=h.skillLevels[key]||1;
     const spell={source:h.id,hero:h.heroId,key,team:h.team,x,z,fromX:h.x,fromZ:h.z,toX:x,toZ:z,color:CHAMP[h.heroId].color};
     if(extended){extendedCast(this,h,key,x,z,extended,spell);equipmentOnCast(this,h,key);this._event('spell',spell);return true;}
@@ -270,12 +270,12 @@ export class Game {
   _canHitStructure(t,h){if(t.kind==='tower'){if(t.tier===4)return this.entities.some(e=>e.team===t.team&&e.kind==='inhibitor'&&!e.alive);return !this.entities.some(e=>e.alive&&e.team===t.team&&e.kind==='tower'&&e.lane===t.lane&&e.tier<t.tier);}if(t.kind==='inhibitor')return !this.entities.some(e=>e.alive&&e.team===t.team&&e.kind==='tower'&&e.lane===t.lane);if(t.kind==='nexus')return this.entities.some(e=>e.team===t.team&&e.kind==='inhibitor'&&!e.alive)&&!this.entities.some(e=>e.alive&&e.team===t.team&&e.kind==='tower'&&e.tier===4);return true;}
   _damage(t,amount,type,source,key='',skipMark=false){
     if(!t.alive||t.invulnerableUntil>this.time||amount<=0)return 0;if(isStructure(t)&&(!source||!this._canHitStructure(t,source)))return 0;
-    amount=extendedDamageAmount(this,t,source,amount,type,key);amount=equipmentDamage(this,t,source,amount,type,key);if(amount<=0)return 0;
+    amount=summonerDamageAmount(this,source,amount,type);amount=extendedDamageAmount(this,t,source,amount,type,key);amount=equipmentDamage(this,t,source,amount,type,key);if(amount<=0)return 0;
     if(t.heroId==='yasuo'&&t.flow>=100&&source?.kind==='hero'){t.flow=0;this._shield(t,75+t.level*14,1.5);this._event('spell',{hero:'yasuo',key:'FLOW',source:t.id,team:t.team,x:t.x,z:t.z,radius:4,color:'#b4deed'});}
     if(t.kind==='ward'){if(key!=='attack')return 0;amount=1;}
     if(isStructure(t)){const hasWave=this.entities.some(e=>e.alive&&e.kind==='minion'&&e.team===source.team&&distance(e,t)<29);if(!hasWave)amount*=.18;}
     let resistance=type==='magic'?t.magicResist:type==='physical'?t.armor:0;if(type==='physical'&&source?.heroId==='yasuo'&&source.armorPenUntil>this.time)resistance*=.6;amount*=100/(100+Math.max(0,resistance||0));if(t.fortifyUntil>this.time)amount*=.65;
-    if(t.shield>0&&t.shieldUntil>this.time){const absorbed=Math.min(t.shield,amount);t.shield-=absorbed;amount-=absorbed;}
+    amount=absorbSummonerBarrier(this,t,amount);if(t.shield>0&&t.shieldUntil>this.time){const absorbed=Math.min(t.shield,amount);t.shield-=absorbed;amount-=absorbed;}
     t.hp=Math.max(0,t.hp-amount);t.lastDamagedAt=this.time;this._cancelRecall(t);
     if(t.heroId==='teemo')this._breakStealth(t);
     if(source){t.lastAttacker=source.id;if(t.kind==='hero'&&source.kind==='hero'){t.contributors=t.contributors||{};t.contributors[source.id]=this.time;for(const tower of this.entities.filter(e=>e.alive&&e.kind==='tower'&&e.team===t.team&&distance(e,source)<e.attackRange))tower.aggroId=source.id;}if(t.kind==='monster')t.aggroId=source.id;}
@@ -286,6 +286,7 @@ export class Game {
   _die(t,killer){
     if(!t.alive)return;t.alive=false;t.hp=0;this._event('death',{x:t.x,z:t.z,target:t.id,source:killer?.id,team:t.team,hero:t.heroId,text:t.kind==='hero'?`${t.name} 已阵亡`:t.kind==='tower'?`${t.name} 被摧毁`:t.name||'单位被击败'});
     if(t.kind==='hero'){
+      resetSummonerState(this,t);
       extendedDeath(this,t);
       t.deaths++;t.respawnAt=this.time+(this.practice&&t.isPlayer?2:9+t.level*1.6);t.command=t.isPlayer?{type:'stop'}:{type:'ai'};t.recallAt=0;t.lightZone=null;t.spinUntil=0;t.shield=0;
       if(t.heroId==='yasuo'){t.dashComboUntil=0;t.qStacks=0;t.qStackUntil=0;t.flow=0;t.dashLocks={};t.armorPenUntil=0;}
@@ -334,7 +335,7 @@ export class Game {
       const length=distance(e,target),dx=(target.x-e.x)/(length||1),dz=(target.z-e.z)/(length||1),along=(nexus.x-e.x)*dx+(nexus.z-e.z)*dz;
       if(along>0&&along<Math.min(length,20)&&lineDistance(nexus,e,target)<7.6){const px=-dz,pz=dx,side=(e.x-nexus.x)*px+(e.z-nexus.z)*pz>=0?1:-1;target=P(nexus.x+px*10*side,nexus.z+pz*10*side);stopDistance=.4;break;}
     }
-    const d=distance(e,target);if(d<=stopDistance)return;let speed=(e.speed||10)*extendedMoveSpeed(this,e,target);if(e.slowUntil>this.time)speed*=1-(e.slowPower||.3)*(1-(e.slowResist||0));if(e.hasteUntil>this.time)speed*=1.35;if(e.baronEmpowered)speed*=1.15;if(e.excitedUntil>this.time)speed*=1.65;if(e.heroId==='teemo'){if(e.teemoRunUntil>this.time)speed*=1.4;else if(e.skillLevels.W&&this.time-e.lastDamagedAt>5)speed*=1.1+e.skillLevels.W*.015;}const step=Math.min(d-stopDistance,speed*dt),next=P(clamp(e.x+(target.x-e.x)/d*step,-120,120),clamp(e.z+(target.z-e.z)/d*step,-120,120));if(e.kind==='hero'&&this.navigation&&!this.navigation.segmentClear(e,next)){e._route=null;return;}e.x=next.x;e.z=next.z;e.facing=Math.atan2(target.z-e.z,target.x-e.x);e.moving=true;if(e.heroId==='yasuo')e.flow=Math.min(100,(e.flow||0)+step*3.5);
+    const d=distance(e,target);if(d<=stopDistance)return;let speed=(e.speed||10)*extendedMoveSpeed(this,e,target)*summonerMoveMultiplier(this,e);if(e.slowUntil>this.time)speed*=1-(e.slowPower||.3)*(1-(e.slowResist||0));if(e.hasteUntil>this.time)speed*=1.35;if(e.baronEmpowered)speed*=1.15;if(e.excitedUntil>this.time)speed*=1.65;if(e.heroId==='teemo'){if(e.teemoRunUntil>this.time)speed*=1.4;else if(e.skillLevels.W&&this.time-e.lastDamagedAt>5)speed*=1.1+e.skillLevels.W*.015;}const step=Math.min(d-stopDistance,speed*dt),next=P(clamp(e.x+(target.x-e.x)/d*step,-120,120),clamp(e.z+(target.z-e.z)/d*step,-120,120));if(e.kind==='hero'&&this.navigation&&!this.navigation.segmentClear(e,next)){e._route=null;return;}e.x=next.x;e.z=next.z;e.facing=Math.atan2(target.z-e.z,target.x-e.x);e.moving=true;if(e.heroId==='yasuo')e.flow=Math.min(100,(e.flow||0)+step*3.5);
   }
   _attack(e,t){
     if(!t?.alive||t.invulnerableUntil>this.time||e.attackCooldown>0||e.stunUntil>this.time||e.airborneUntil>this.time||e.invulnerableUntil>this.time||distance(e,t)>e.attackRange+t.radius)return false;
@@ -371,8 +372,8 @@ export class Game {
     const fountain=this._nearBase(h),healingPenalty=equipmentHealingMultiplier(h,this.time);h.hp=Math.min(h.maxHp,h.hp+dt*(fountain?h.maxHp*.18:1.1+(h.heroId==='garen'&&this.time-h.lastDamagedAt>7?h.maxHp*.012:0))*healingPenalty);h.mana=Math.min(h.maxMana,h.mana+dt*(fountain?h.maxMana*.2:2+h.manaRegen+(h.blueBuffUntil>this.time?9:0)));if(this.practice&&h.isPlayer)h.mana=h.maxMana;
     if(h.potionUntil>this.time)h.hp=Math.min(h.maxHp,h.hp+25*dt*healingPenalty);
     if(h.shieldUntil<this.time)h.shield=0;
-    if(h.igniteUntil>this.time&&h.igniteTick<=this.time){h.igniteTick+=1;this._damage(h,h.igniteDamage,'true',this.getEntity(h.igniteSource),'F');if(!h.alive)return;}
-    equipmentUpdate(this,h,dt);if(!h.alive)return;if(extendedHeroUpdate(this,h,dt))return;
+    if(h.igniteUntil>this.time&&h.igniteTick<=this.time){h.igniteTick+=1;this._damage(h,h.igniteDamage,'true',this.getEntity(h.igniteSource),h.igniteKey||'F');if(!h.alive)return;}
+    equipmentUpdate(this,h,dt);if(!h.alive)return;updateSummonerAI(this,h);if(updateSummoner(this,h))return;if(extendedHeroUpdate(this,h,dt))return;
     if(h.recallAt){if(this.time>=h.recallAt){h.x=h.spawnX;h.z=h.spawnZ;h.recallAt=0;h.command=h.isPlayer?{type:'stop'}:{type:'ai'};this._event('recall',{source:h.id,x:h.x,z:h.z,team:h.team,text:'回城完成'});}return;}
     if(h.spinUntil>this.time&&h.spinTick<=this.time){h.spinTick+=.35;for(const t of this._enemies(h,9,e=>!isStructure(e)))this._damage(t,h.spinDamage,'physical',h,'E');this._event('spell',{source:h.id,hero:'garen',key:'SPIN',x:h.x,z:h.z,radius:8,team:h.team,color:'#f1d77f'});}
     if(h.stunUntil>this.time||h.invulnerableUntil>this.time)return;
