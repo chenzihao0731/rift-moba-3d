@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#071217" />
+    <meta name="description" content="进入 3D 召唤师峡谷，操控英雄，补刀、插眼、购买装备、争夺野区与推塔。" />
+    <title>RIFT 3D · 召唤师峡谷</title>
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body>
+    <svg class="icon-library" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <symbol id="i-shop" viewBox="0 0 24 24"><path d="m4 8 2-5h12l2 5M3 8h18v4a3 3 0 0 1-6 0 3 3 0 0 1-6 0 3 3 0 0 1-6 0V8ZM5 15v6h14v-6M10 21v-5h4v5"/></symbol>
+        <symbol id="i-recall" viewBox="0 0 24 24"><path d="M6 6a8 8 0 1 1-2 9M6 2v5H1M8 12h8M12 8v8"/></symbol>
+        <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></symbol>
+        <symbol id="i-camera" viewBox="0 0 24 24"><path d="M4 5H1v4M20 5h3v4M4 19H1v-4M20 19h3v-4M8 8h8v8H8zM12 3v3M12 18v3"/></symbol>
+        <symbol id="i-help" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M9 8a3 3 0 0 1 6 1c0 2-3 2-3 5M12 18v.01"/></symbol>
+        <symbol id="i-sound" viewBox="0 0 24 24"><path d="M3 9v6h4l5 4V5L7 9H3ZM16 8a6 6 0 0 1 0 8M19 5a10 10 0 0 1 0 14"/></symbol>
+        <symbol id="i-pause" viewBox="0 0 24 24"><path d="M8 5v14M16 5v14"/></symbol>
+        <symbol id="i-close" viewBox="0 0 24 24"><path d="m6 6 12 12M6 18 18 6"/></symbol>
+        <symbol id="i-play" viewBox="0 0 24 24"><path d="m9 5 11 7-11 7V5Z"/></symbol>
+        <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M3 12h17M14 5l7 7-7 7"/></symbol>
+        <symbol id="i-coin" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M12 6v12M15 8h-4a2 2 0 0 0 0 4h2a2 2 0 0 1 0 4H9"/></symbol>
+      </defs>
+    </svg>
+
+    <canvas id="game-canvas" aria-label="召唤师峡谷 3D 游戏场景"></canvas>
+    <div id="labels" aria-hidden="true"></div>
+
+    <div id="loading-screen" class="loading-screen hidden">
+      <div class="loading-rune"><span></span><span></span><span></span></div>
+      <p>正在唤醒峡谷</p><small>LOADING THE RIFT</small>
+    </div>
+
+    <section id="lobby" class="overlay lobby" aria-label="选择英雄并开始游戏">
+      <header class="lobby-topline">
+        <div class="lobby-wordmark"><span class="brand-rune">R</span><span>RIFT<span class="brand-number">3D</span></span></div>
+        <span class="lobby-edition">召唤师峡谷 <i></i> 战术竞技</span>
+        <div class="lobby-live"><span></span> 峡谷已就绪</div>
+      </header>
+
+      <div class="lobby-intro">
+        <div class="eyebrow"><span></span> WELCOME TO SUMMONER’S RIFT</div>
+        <h1>每一步，<br />都通往<span>胜利。</span></h1>
+        <p>选择你的英雄，踏入 3D 召唤师峡谷。<br />补刀发育、掌控视野，与队伍一起摧毁敌方水晶。</p>
+        <div class="lobby-pillars"><span>三路战场</span><i></i><span>野区争夺</span><i></i><span>五种英雄玩法</span></div>
+      </div>
+
+      <div class="hero-selection">
+        <div class="selection-heading"><span class="section-index">01</span><h2>选择你的英雄</h2><span class="selection-hint">CHOOSE YOUR CHAMPION</span></div>
+        <div id="hero-grid" class="hero-grid"></div>
+        <div class="selected-hero-details"><div><h3 id="hero-title">九尾妖狐 · 阿狸</h3><p id="hero-description">灵巧的法师。用法球消耗敌人，魅惑控制，再用灵魄突袭完成击杀。</p><p id="hero-combo" class="hero-combo">E 魅惑 → Q 宝珠 → W 狐火 → R 突袭</p></div><span class="hero-choice-mark">◆</span></div>
+      </div>
+
+      <footer class="lobby-footer">
+        <label class="practice-option"><input id="practice-toggle" type="checkbox" /><span class="custom-check"></span><span>练习模式<small>自由熟悉技能与地图</small></span></label>
+        <p class="lobby-key-hint"><kbd>右键</kbd> 移动与攻击 <span>·</span> <kbd>Q W E R</kbd> 释放技能 <span>·</span> <kbd>P</kbd> 购买装备</p>
+        <button id="start-game" class="primary-button"><span>进入峡谷</span><svg><use href="#i-arrow"/></svg></button>
+      </footer>
+      <div class="lobby-bottom-note">单人即时对战 · 五位可操控英雄 · 原创 3D 场景</div>
+    </section>
+
+    <div id="hud" class="hidden">
+      <header class="match-topbar">
+        <div id="game-brand" class="game-brand">RIFT <span>3D</span></div>
+        <div class="match-score"><span class="team-name blue">蓝方</span><strong id="score-blue">0</strong><span class="score-separator">/</span><strong id="score-red">0</strong><span class="team-name red">红方</span></div>
+        <div class="match-clock"><span class="clock-dot"></span><span id="match-time">00:00</span></div>
+        <div class="performance"><span><b id="fps">60</b> FPS</span><span><b id="ping">本地对局</b></span></div>
+      </header>
+
+      <div class="match-actions">
+        <button id="sound-button" class="icon-button" title="切换音效" aria-label="切换音效"><svg><use href="#i-sound"/></svg><span class="control-state hidden">声音 关</span></button>
+        <button id="help-button" class="icon-button" title="操作指南" aria-label="操作指南"><svg><use href="#i-help"/></svg></button>
+        <button id="pause-button" class="icon-button" title="暂停 · Esc" aria-label="暂停游戏"><svg><use href="#i-pause"/></svg><span class="control-state hidden">暂停</span></button>
+      </div>
+
+      <aside class="match-stats"><div><span>击杀 / 死亡 / 助攻</span><strong id="kda">0 / 0 / 0</strong></div><div><span>补刀</span><strong id="cs">0</strong></div><p><kbd>Tab</kbd> 查看战况</p></aside>
+      <div id="event-feed" class="event-feed" aria-live="polite"></div>
+
+      <div id="target-panel" class="target-panel hidden"><div class="target-eyebrow">当前目标</div><strong id="target-name">敌方目标</strong><div class="target-health"><div id="target-hp-fill"></div></div></div>
+
+      <div class="battle-hud">
+        <div class="hero-status">
+          <div class="portrait-frame"><img id="hero-portrait" alt="当前英雄" /><span id="hero-level">1</span></div>
+          <div class="hero-vitals"><div class="hero-heading"><strong id="hero-name">阿狸</strong><span>CHAMPION</span></div><div class="vital-bar health-bar"><div id="hp-fill"></div><span id="hp-text">1000 / 1000</span></div><div class="vital-bar mana-bar"><div id="mana-fill"></div><span id="mana-text">500 / 500</span></div><div class="experience-bar"><div id="xp-fill"></div></div></div>
+        </div>
+        <div class="ability-section"><div id="skills" class="skills"></div><div class="ability-caption">英雄技能 <span>Q · W · E · R</span></div></div>
+        <div class="summoner-section"><div id="summoners" class="summoners"></div><span>召唤师技能</span></div>
+        <div class="inventory-section"><div id="inventory" class="inventory"></div><div class="gold-counter"><svg><use href="#i-coin"/></svg><strong id="gold">500</strong><span>金币</span></div></div>
+      </div>
+
+      <div class="utility-actions">
+        <button id="shop-button" class="utility-button"><svg><use href="#i-shop"/></svg><span>商店</span><kbd>P</kbd></button>
+        <button id="recall-button" class="utility-button"><svg><use href="#i-recall"/></svg><span>回城</span><kbd>B</kbd></button>
+        <button id="ward-button" class="utility-button"><svg><use href="#i-eye"/></svg><span>插眼</span><kbd>4</kbd></button>
+        <button id="camera-button" class="utility-button"><svg><use href="#i-camera"/></svg><span>跟随</span><kbd>空格</kbd></button>
+      </div>
+
+      <div id="minimap-wrap" class="minimap-wrap"><div class="minimap-heading"><span>召唤师峡谷</span><span class="map-orientation">N ↑</span></div><canvas id="minimap" width="200" height="200" aria-label="小地图，点击移动视角或英雄"></canvas><div class="minimap-bottom"><span class="blue-dot"></span> 我方 <span class="red-dot"></span> 敌方</div></div>
+      <div class="aim-help">右键移动 / 攻击 <span>·</span> 技能后左键选择方向 <span>·</span> 滚轮缩放</div>
+    </div>
+
+    <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
+
+    <section id="shop-panel" class="overlay modal-overlay hidden" aria-label="装备商店">
+      <div class="shop-window modal-window"><header class="modal-heading"><div><span class="eyebrow">ARMORY</span><h2>装备商店</h2></div><div class="shop-balance"><svg><use href="#i-coin"/></svg><span id="shop-gold">500</span><small>金币</small></div><button id="shop-close" class="icon-button close-button" aria-label="关闭商店"><svg><use href="#i-close"/></svg></button></header><div class="shop-intro">根据英雄选择装备，提升攻击、法术、生命与机动能力。</div><div id="shop-items" class="shop-items"></div><footer id="shop-status" class="shop-status">靠近己方基地商店即可购买装备。</footer></div>
+    </section>
+
+    <section id="help-panel" class="overlay modal-overlay hidden" aria-label="游戏操作指南">
+      <div class="help-window modal-window"><header class="modal-heading"><div><span class="eyebrow">FIELD GUIDE</span><h2>峡谷作战手册</h2></div><button id="help-close" class="icon-button close-button" aria-label="关闭操作指南"><svg><use href="#i-close"/></svg></button></header><div class="help-content"><div class="help-column"><h3>移动与战斗</h3><dl><div><dt><kbd>鼠标右键</kbd></dt><dd>点击地面移动，点击敌人持续攻击</dd></div><div><dt><kbd>Q</kbd><kbd>W</kbd><kbd>E</kbd><kbd>R</kbd></dt><dd>选择技能，左键确认目标或施法方向</dd></div><div><dt><kbd>Shift + 技能</kbd></dt><dd>朝鼠标位置快速施法</dd></div><div><dt><kbd>Ctrl + 技能</kbd></dt><dd>消耗技能点，升级对应技能</dd></div><div><dt><kbd>D</kbd></dt><dd>闪现，快速位移至鼠标方向</dd></div><div><dt><kbd>F</kbd></dt><dd>点燃，对选中的敌方英雄造成持续伤害</dd></div><div><dt><kbd>A</kbd></dt><dd>攻击移动，寻找附近敌人</dd></div><div><dt><kbd>S</kbd></dt><dd>停止移动与攻击</dd></div><div><dt><kbd>B</kbd></dt><dd>引导回城，受到伤害会打断</dd></div></dl><h3>视野与视角</h3><dl><div><dt><kbd>4</kbd></dt><dd>放置侦查守卫，照亮附近区域</dd></div><div><dt><kbd>空格</kbd></dt><dd>按住将视角移至当前英雄</dd></div><div><dt><kbd>Y</kbd></dt><dd>切换英雄跟随与自由视角</dd></div><div><dt><kbd>滚轮</kbd></dt><dd>拉近或拉远镜头</dd></div><div><dt><kbd>屏幕边缘</kbd></dt><dd>移动镜头，探索地图</dd></div></dl></div><div class="help-column"><h3>装备与战况</h3><dl><div><dt><kbd>P</kbd></dt><dd>打开商店，在基地购买装备</dd></div><div><dt><kbd>1</kbd><kbd>2</kbd><kbd>3</kbd><kbd>5</kbd><kbd>6</kbd><kbd>7</kbd></dt><dd>使用对应装备栏的主动效果</dd></div><div><dt><kbd>Tab</kbd></dt><dd>按住查看双方战况</dd></div><div><dt><kbd>Esc</kbd></dt><dd>取消瞄准、关闭窗口或暂停</dd></div></dl><h3>赢得这场战斗</h3><div class="strategy-note"><b>补刀发育</b><p>对小兵打出最后一击，获得金币和补刀数；击杀附近敌人积累经验。</p></div><div class="strategy-note"><b>兵线推塔</b><p>跟随己方小兵推进。先拆除防御塔与召唤水晶，再摧毁敌方主水晶。</p></div><div class="strategy-note"><b>掌控野区</b><p>草丛能够隐藏敌人。插眼侦查，争夺巨龙与纳什男爵，取得战场优势。</p></div><div class="mobile-help"><b>触屏操作</b><p>点按地面移动，点按敌人攻击；点击技能后，再点战场选择目标。点击小地图快速定位。</p></div></div></div><footer class="help-footer">了解你选择的英雄：悬停技能图标可查看技能说明。</footer></div>
+    </section>
+
+    <section id="pause-panel" class="overlay modal-overlay hidden" aria-label="游戏已暂停"><div class="pause-window modal-window"><div class="pause-rune">Ⅱ</div><span class="eyebrow">TAKE A BREATH</span><h2>战场已暂停</h2><p>稍作调整，准备下一次出击。</p><button id="resume-button" class="primary-button">继续战斗<svg><use href="#i-play"/></svg></button><button id="restart-button" class="secondary-button">重新开始</button><button id="lobby-button" class="text-button">返回英雄选择</button><small><kbd>Esc</kbd> 继续游戏</small></div></section>
+
+    <section id="end-panel" class="overlay modal-overlay hidden" aria-label="对局结束"><div class="end-window modal-window"><span class="eyebrow">THE RIFT REMEMBERS</span><div class="victory-ornament"><span></span><b>◆</b><span></span></div><h2 id="end-title">胜利</h2><p class="end-subtitle">每一场战斗，都是传奇的一页。</p><div id="end-stats" class="end-stats"></div><button id="play-again" class="primary-button">再次征战<svg><use href="#i-arrow"/></svg></button></div></section>
+
+    <section id="scoreboard" class="overlay scoreboard-overlay hidden" aria-label="战况面板"><div class="scoreboard-window modal-window"><div class="scoreboard-title"><span class="eyebrow">MATCH OVERVIEW</span><h2>对局战况</h2><small>松开 <kbd>Tab</kbd> 返回战场</small></div><div id="scoreboard-body"></div></div></section>
+
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
