@@ -120,10 +120,15 @@ export class Game {
   _event(type,data={}){this.events.push({type,time:this.time,...data});if(this.events.length>500)this.events.splice(0,150);}
   getEntity(id){return this.entities.find(e=>e.id===id);}
   moveTo(x,z){if(!this.player.alive)return;this._cancelRecall(this.player);const p={x:clamp(x,-119,119),z:clamp(z,-119,119)},destination=this.navigation?this.navigation.nearestPoint(p):p;this.player._route=null;this.player.command={type:'move',...destination};}
-  attackMoveTo(x,z){this.moveTo(x,z);this.player.command.type='attackMove';}
-  attackMove(x,z){this.attackMoveTo(x,z);}
-  attackTarget(id){const t=this.getEntity(id);if(!this.player.alive||!t?.alive||t.team===this.player.team)return false;this._cancelRecall(this.player);this.player.command={type:'attack',targetId:id};return true;}
-  stop(){this._cancelRecall(this.player);this.player.command={type:'stop'};}
+  attackMoveTo(x,z,targetId){
+    if(!this.player.alive)return false;
+    // Clicking an enemy is an explicit attack, including neutral camps and revealed wards.
+    if(targetId&&this.attackTarget(targetId))return true;
+    this.moveTo(x,z);this.player.command={...this.player.command,type:'attackMove',cursorX:clamp(x,-119,119),cursorZ:clamp(z,-119,119),targetId:0};return true;
+  }
+  attackMove(x,z,targetId){return this.attackMoveTo(x,z,targetId);}
+  attackTarget(id){const t=this.getEntity(id);if(!this.player.alive||!this._canAttackTarget(this.player,t))return false;this._cancelRecall(this.player);this.player._route=null;this.player.command={type:'attack',targetId:id};return true;}
+  stop(){this._cancelRecall(this.player);this.player._route=null;this.player.command={type:'stop'};}
   recall(){const h=this.player;if(!h.alive||this.winner)return false;h.command={type:'stop'};h.recallAt=this.time+(this.practice?2:6);this._event('recall',{x:h.x,z:h.z,team:h.team,source:h.id,text:'正在回城'});return true;}
   _cancelRecall(h){h.recallAt=0;}
   _nearBase(h){return distance(h,BASE[h.team])<20;}
@@ -147,6 +152,16 @@ export class Game {
     return this.entities.some(v=>v.alive&&v.team===team&&(v.kind==='hero'||v.kind==='minion'||v.kind==='tower'||v.kind==='ward')&&distance(v,e)<(v.visionRange||(v.kind==='hero'?31:v.kind==='tower'?31:20))&&(!bush||v.kind==='ward'||distance(v,bush)<10||e.lastDamagedAt>this.time-1.5));
   }
   unitsTeamVisible(e,team='blue'){return this.isVisible(e,team);}
+  _canAttackTarget(h,t,allowNeutral=true,allowWard=true){return !!(t?.alive&&t.id!==h.id&&t.team!==h.team&&(allowNeutral||t.team!=='neutral')&&(allowWard||t.kind!=='ward')&&this.isVisible(t,h.team)&&!(t.invulnerableUntil>this.time)&&(!isStructure(t)||this._canHitStructure(t,h)));}
+  _attackMoveTarget(h,cursor){
+    let target=null,best=Infinity;
+    for(const e of this.entities){
+      // Ground attack-move acquires locally; it never walks off toward a distant enemy or camp.
+      if(!this._canAttackTarget(h,e,false,false)||distance(h,e)>h.attackRange+e.radius)continue;
+      const score=distance(cursor,e);if(score<best){best=score;target=e;}
+    }
+    return target;
+  }
   _enemies(h,range,filter=()=>true){return this.entities.filter(e=>e.alive&&e.team!==h.team&&e.team!=='neutral'&&e.kind!=='ward'&&distance(e,h)<range+e.radius&&filter(e));}
   _nearest(h,range,filter=()=>true,allowNeutral=false){let best=null,score=Infinity;for(const e of this.entities){if(!e.alive||e.id===h.id||e.team===h.team||(!allowNeutral&&e.team==='neutral')||e.kind==='ward'||!filter(e))continue;if(e.team!=='neutral'&&!this.isVisible(e,h.team))continue;const d=distance(h,e);if(d<range+e.radius){let s=d+(isStructure(e)?8:0)+(e.kind==='hero'?-3:0);if(s<score){score=s;best=e;}}}return best;}
   cast(key,x=this.player.x,z=this.player.z,targetId){return this._cast(this.player,String(key).toUpperCase(),x,z,targetId);}
@@ -278,7 +293,7 @@ export class Game {
       if(nav.segmentClear(e,goal)){target=goal;e._route=null;}
       else{
         const route=e._route;
-        if(!route||distance(route.target,goal)>6||this.time>route.until){const path=nav.findPath(e,goal);e._route={points:path.points,index:0,target:goal,until:this.time+1};if(e.isPlayer&&['move','attackMove'].includes(e.command.type)&&distance(path.destination,goal)>.5){e.command.x=path.destination.x;e.command.z=path.destination.z;e._route.target=path.destination;}}
+        if(!route||distance(route.target,goal)>6||this.time>route.until){const path=nav.findPath(e,goal);e._route={points:path.points,index:0,target:goal,until:this.time+1};if(e.isPlayer&&target===e.command&&['move','attackMove'].includes(e.command.type)&&distance(path.destination,goal)>.5){e.command.x=path.destination.x;e.command.z=path.destination.z;e._route.target=path.destination;}}
         const current=e._route;if(!current.points.length)return;
         while(current.index<current.points.length-1&&distance(e,current.points[current.index])<.7)current.index++;
         // Advance to a later waypoint whenever there is an unobstructed shortcut.
@@ -321,8 +336,16 @@ export class Game {
     if(h.charmUntil>this.time){const charmer=this.getEntity(h.charmSource);if(charmer)this._walk(h,charmer,dt,3);return;}
     if(!h.isPlayer){this._aiHero(h,dt);return;}
     const cmd=h.command;if(cmd.type==='move'){this._walk(h,cmd,dt);if(distance(h,cmd)<.6)h.command={type:'guard'};}
-    else if(cmd.type==='attack'){const t=this.getEntity(cmd.targetId);if(!t?.alive||!this.isVisible(t,h.team)){h.command={type:'guard'};return;}if(distance(h,t)>h.attackRange+t.radius-.5)this._walk(h,t,dt,h.attackRange+t.radius-1);this._attack(h,t);}
-    else if(cmd.type==='attackMove'){const t=this._nearest(h,30,e=>e.kind!=='monster');if(t){this._walk(h,t,dt,h.attackRange+t.radius-1);this._attack(h,t);}else{this._walk(h,cmd,dt);if(distance(h,cmd)<.8)h.command={type:'guard'};}}
+    else if(cmd.type==='attack'){const t=this.getEntity(cmd.targetId);if(!this._canAttackTarget(h,t)){h.command={type:'guard'};return;}if(distance(h,t)>h.attackRange+t.radius-.5)this._walk(h,t,dt,h.attackRange+t.radius-1);this._attack(h,t);}
+    else if(cmd.type==='attackMove'){
+      let t=this.getEntity(cmd.targetId);
+      // Keep the chosen target through the attack cooldown; a small tolerance avoids boundary jitter.
+      if(!this._canAttackTarget(h,t,false,false)||distance(h,t)>h.attackRange+t.radius+1)t=null;
+      if(!t)t=this._attackMoveTarget(h,{x:cmd.cursorX??cmd.x,z:cmd.cursorZ??cmd.z});
+      cmd.targetId=t?.id||0;
+      if(t){if(distance(h,t)>h.attackRange+t.radius)this._walk(h,t,dt,h.attackRange+t.radius-.2);this._attack(h,t);}
+      else this._walk(h,cmd,dt);
+    }
     else if(cmd.type==='guard'){const t=this._nearest(h,h.attackRange,e=>e.kind!=='monster');if(t)this._attack(h,t);}
   }
   _aiHero(h,dt){

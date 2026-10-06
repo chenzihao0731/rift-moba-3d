@@ -93,6 +93,137 @@ test('only the last hit grants creep score and minion gold', () => {
   assert.equal(player.cs, 1, 'nearby shared XP must not award a last hit');
 });
 
+test('attack-move honors a clicked enemy and explicitly attacks a neutral camp', () => {
+  const { game, player, target } = duel('ashe');
+  target.x = 40;
+  assert.equal(game.attackMove(40, 0, target.id), true);
+  assert.deepEqual(player.command, { type: 'attack', targetId: target.id });
+  const monster = game._monster('wolves', 10, 0, 1000, 0, 45, 60, '暗影狼');
+  assert.equal(game.attackMoveTo(10, 0, monster.id), true);
+  assert.deepEqual(player.command, { type: 'attack', targetId: monster.id });
+  tick(game, .5);
+  assert.ok(monster.hp < monster.maxHp);
+  assert.equal(monster.aggroId, player.id);
+});
+
+test('ground attack-move selects the in-range enemy closest to the cursor and holds it through cooldown', () => {
+  const { game, player, target } = duel('ashe');
+  const minion = game._entity({ kind: 'minion', team: 'red', x: 20, z: 0,
+    hp: 1000, maxHp: 1000, radius: 1.2, stunUntil: 1000 });
+  player.attackCooldown = 2;
+  game.attackMove(60, 0);
+  tick(game, .05);
+  assert.equal(player.command.targetId, minion.id, 'the cursor-facing minion wins over a closer hero');
+  target.x = 23;
+  minion.x = 18;
+  tick(game, .2);
+  assert.equal(player.command.targetId, minion.id, 'changing distances must not switch a valid current target');
+  assert.equal(player.x, 0, 'an in-range target must not pull the champion forward between attacks');
+  assert.equal(player.z, 0);
+});
+
+test('attack-move resumes its original destination when the local target dies or leaves range', () => {
+  const { game, player, target } = duel('ashe');
+  player.attackCooldown = 2;
+  game.attackMove(60, 0);
+  tick(game, .05);
+  assert.equal(player.command.targetId, target.id);
+  game._die(target, player);
+  tick(game, .05);
+  assert.equal(player.command.type, 'attackMove');
+  assert.equal(player.command.targetId, 0);
+  assert.equal(player.command.x, 60);
+  assert.ok(player.x > 0);
+  target.alive = true; target.hp = target.maxHp; target.x = 15;
+  tick(game, .05);
+  assert.equal(player.command.targetId, target.id);
+  target.x = -40;
+  const before = player.x;
+  tick(game, .05);
+  assert.equal(player.command.targetId, 0);
+  assert.ok(player.x > before, 'a retreating enemy must not turn the player away from the stored destination');
+});
+
+test('attack-move drops targets that disappear into an unwarded brush', () => {
+  const { game, player, target } = duel('ashe');
+  game.practice = false;
+  player.x = -20; player.z = 0;
+  target.x = -20; target.z = -16;
+  player.attackCooldown = 2;
+  game._addWard(player, -20, -10, false);
+  const ward = game.entities.find(e => e.kind === 'ward');
+  assert.equal(game.isVisible(target), true);
+  game.attackMove(-20, -40);
+  tick(game, .05);
+  assert.equal(player.command.targetId, target.id);
+  ward.alive = false;
+  assert.equal(game.isVisible(target), false);
+  tick(game, .05);
+  assert.equal(player.command.targetId, 0);
+  assert.equal(player.command.z, -40);
+  assert.ok(player.z < 0);
+  assert.equal(game.attackTarget(target.id), false, 'an explicit attack also needs current vision');
+});
+
+test('melee ground attack-move does not chase enemies outside actual attack range or aggro neutral camps', () => {
+  const { game, player, target } = duel('garen');
+  target.x = 20;
+  const monster = game._monster('wolves', 4, 0, 1000, 0, 45, 60, '暗影狼');
+  game.attackMove(0, 60);
+  tick(game, .5);
+  assert.equal(player.command.targetId, 0);
+  assert.equal(player.x, 0);
+  assert.ok(player.z > 5, 'Garen must continue toward the ground destination rather than chase a distant hero');
+  assert.equal(monster.aggroId, null);
+  assert.equal(monster.hp, monster.maxHp);
+  assert.equal(game.events.some(e => e.type === 'attack' && e.source === player.id), false);
+});
+
+test('ground attack-move skips protected structures and explicit attacks require revealed wards', () => {
+  const { game, player } = duel('ashe');
+  game.entities = [player];
+  const outer = game._entity({ kind: 'tower', team: 'red', x: 80, z: 0, hp: 1000, maxHp: 1000,
+    lane: 'mid', tier: 1, radius: 3 });
+  const inner = game._entity({ kind: 'tower', team: 'red', x: 10, z: 0, hp: 1000, maxHp: 1000,
+    lane: 'mid', tier: 2, radius: 3 });
+  player.attackCooldown = 2;
+  assert.equal(game.attackTarget(inner.id), false);
+  game.attackMove(60, 0);
+  tick(game, .05);
+  assert.equal(player.command.targetId, 0);
+  assert.ok(player.x > 0);
+  outer.alive = false;
+  tick(game, .05);
+  assert.equal(player.command.targetId, inner.id);
+  game.practice = false;
+  const ward = game._entity({ kind: 'ward', team: 'red', x: 5, z: 0, hp: 3, maxHp: 3,
+    radius: 1, control: false, expiresAt: 90 });
+  assert.equal(game.attackTarget(ward.id), false);
+  game._addWard(player, 5, 0, true);
+  assert.equal(game.attackMove(5, 0, ward.id), true);
+  assert.deepEqual(player.command, { type: 'attack', targetId: ward.id });
+});
+
+test('stop and movement replace attack-move without retaining its acquired target', () => {
+  const { game, player, target } = duel('ashe');
+  player.attackCooldown = 2;
+  game.attackMove(60, 0);
+  tick(game, .05);
+  assert.equal(player.command.targetId, target.id);
+  game.stop();
+  tick(game, .1);
+  assert.deepEqual(player.command, { type: 'stop' });
+  assert.equal(player.x, 0);
+  game.attackMove(60, 0);
+  tick(game, .05);
+  game.moveTo(0, 60);
+  tick(game, .1);
+  assert.equal(player.command.type, 'move');
+  assert.equal(player.command.targetId, undefined);
+  assert.equal(player.x, 0);
+  assert.ok(player.z > 0);
+});
+
 test('wards consume charges, reveal fog and expose stealth wards with true sight', () => {
   const game = new Game();
   const player = game.player;

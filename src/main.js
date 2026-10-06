@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { createWorld } from './world.js';
 import { Actors } from './actors.js';
 import { Game, CHAMPIONS, ITEMS, LANES } from './simulation.js';
+import { cameraDrag, cameraPan } from './camera-controls.js';
 import './style.css';
 
 const $=id=>document.getElementById(id), txt=(id,v)=>{const el=$(id);if(!el)return;if(['ward-button','camera-button','sound-button','pause-button'].includes(id)){const span=el.querySelector('span');if(span)span.textContent=v;el.title=String(v);el.setAttribute('aria-label',v);}else el.textContent=v;}, show=(id,v=true)=>$(id)?.classList.toggle('hidden',!v);
@@ -17,6 +18,7 @@ let heroId=localStorage.getItem('rift-hero')||'ahri';if(!CHAMPIONS.some(h=>h.id=
 let game=new Game({hero:heroId}),running=false,paused=false,ended=false,locked=true,sound=false,armed=null,selected=null;
 game.setObstacles?.(world.obstacles||[]);
 let zoom=68,width=innerWidth,height=innerHeight,mouse={x:width/2,y:height/2,inside:false},targetPoint={x:0,z:0};const cameraCenter=new THREE.Vector3(0,0,0),ray=new THREE.Raycaster(),ndc=new THREE.Vector2(),plane=new THREE.Plane(new THREE.Vector3(0,1,0),0),rayPoint=new THREE.Vector3();
+let cameraGesture=null,hovered=null;
 const clock=new THREE.Clock();let total=0,hudTime=0,fpsFrames=0,fpsTime=0;const minimap=$('minimap'),mctx=minimap.getContext('2d');
 const aim=new THREE.Group();const aimCircle=new THREE.Mesh(new THREE.RingGeometry(9.8,10,80),new THREE.MeshBasicMaterial({color:0x72eddc,transparent:true,opacity:.55,side:THREE.DoubleSide,depthWrite:false}));aimCircle.rotation.x=-Math.PI/2;aim.add(aimCircle);const aimGeometry=new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(),new THREE.Vector3()]);const aimLine=new THREE.Line(aimGeometry,new THREE.LineBasicMaterial({color:0xa2f5e3,transparent:true,opacity:.9}));aim.add(aimLine);aim.visible=false;scene.add(aim);
 const fogCanvas=document.createElement('canvas');fogCanvas.width=fogCanvas.height=minimap.width;const fogContext=fogCanvas.getContext('2d');
@@ -30,25 +32,79 @@ function setupHud(){const h=CHAMPIONS.find(h=>h.id===heroId);$('hero-portrait').
  $('skills').innerHTML=h.skills.map((s,i)=>`<button class="skill-slot" data-key="${s.key}" title="${s.key} ${s.name}\n${s.description}\n消耗 ${s.cost||0} · 冷却 ${s.cooldown||0} 秒"><span class="skill-icon" style="--skill-hue:${[185,220,320,45][i]}"><img src="${BASE_URL}assets/${heroId}-${s.key}.png" alt="${s.name}" draggable="false"></span><span class="skill-key">${s.key}</span><span class="skill-name">${s.name}</span><span class="cooldown"></span><span class="skill-level-dots"></span><span class="upgrade-skill hidden" title="升级技能">+</span></button>`).join('');skillButtons=[...$('skills').children];skillButtons.forEach(b=>b.addEventListener('click',e=>{if(e.target.closest('.upgrade-skill')){game.levelSkill?.(b.dataset.key);return;}armSkill(b.dataset.key);}));
  $('summoners').innerHTML=[['D','闪现','闪'],['F','引燃','焚']].map(([key,name,icon])=>`<button class="skill-slot summoner-slot" data-key="${key}" title="${key} ${name}"><span class="skill-icon"><img src="${BASE_URL}assets/summoner-${key}.png" alt="${name}" draggable="false"></span><span class="skill-key">${key}</span><span class="skill-name">${name}</span><span class="cooldown"></span></button>`).join('');sumButtons=[...$('summoners').children];sumButtons.forEach(b=>b.addEventListener('click',()=>armSkill(b.dataset.key)));
  const keys=['1','2','3','5','6','7'];$('inventory').innerHTML=keys.map((k,i)=>`<button class="item-slot" data-index="${i}" title="空装备栏"><span class="item-icon"></span><span class="item-key">${k}</span></button>`).join('');itemButtons=[...$('inventory').children];itemButtons.forEach((b,i)=>b.addEventListener('click',()=>game.useItem(i,targetPoint.x,targetPoint.z)));renderShop();}
-function start(){game=new Game({hero:heroId,practice:$('practice-toggle')?.checked||false});game.setObstacles?.(world.obstacles||[]);actors.clear();running=true;paused=false;ended=false;armed=null;selected=null;locked=true;zoom=innerWidth<700?50:63;cameraCenter.set(game.player.x,0,game.player.z);['lobby','pause-panel','end-panel','help-panel','shop-panel','loading-screen'].forEach(id=>show(id,false));show('hud');document.body.classList.add('in-game');setupHud();resize();toast('欢迎来到召唤师峡谷。右键移动，Q / W / E / R 施法。',5500);soundEvent('start');updateHud();}
-function setPause(v){if(!running||ended)return;paused=v;show('pause-panel',v);txt('pause-button',v?'继续':'暂停');}
+function start(){game=new Game({hero:heroId,practice:$('practice-toggle')?.checked||false});game.setObstacles?.(world.obstacles||[]);actors.clear();running=true;paused=false;ended=false;armed=null;selected=null;cameraGesture=null;locked=true;zoom=innerWidth<700?50:63;cameraCenter.set(game.player.x,0,game.player.z);['lobby','pause-panel','end-panel','help-panel','shop-panel','loading-screen'].forEach(id=>show(id,false));show('hud');document.body.classList.add('in-game');setupHud();resize();toast('欢迎来到召唤师峡谷。右键移动，Q / W / E / R 施法。',5500);soundEvent('start');updateHud();updateCameraButton();updateCursor();}
+function setPause(v){if(!running||ended)return;cancelCameraGesture();paused=v;show('pause-panel',v);txt('pause-button',v?'继续':'暂停');}
 function openShop(){show('shop-panel',$('shop-panel').classList.contains('hidden'));if(!$('shop-panel').classList.contains('hidden'))renderShop();}
 function renderShop(){if(!$('shop-items'))return;$('shop-items').innerHTML=ITEMS.map((i,n)=>`<button class="item-card" data-item="${i.id}" title="${i.description}"><span class="shop-item-icon" style="--item-hue:${n*37}"><img src="${BASE_URL}assets/item-${i.id}.png" alt="${i.name}"></span><span class="shop-item-info"><strong>${i.name}</strong><small>${i.description}</small><span class="item-cost">${i.cost} 金币</span></span></button>`).join('');$('shop-items').querySelectorAll('button').forEach(b=>b.addEventListener('click',()=>{const success=game.buy(b.dataset.item);if(success){soundEvent('purchase');updateHud();}processEvents();}));}
 function itemGlyph(i,n=0){return ['剑','靴','刃','杖','盾','弓','药','晶','书','刃','甲','戒'][n%12];}
-function armSkill(key){if(!running||paused||!game.player.alive)return;if(key==='A'||key==='4'){armed=key;toast(key==='A'?'点击地面进行攻击移动':'点击目标位置放置侦查守卫',2200);return;}const instant=(heroId==='garen'&&['Q','W','E'].includes(key))||key==='W'&&heroId==='ahri'||key==='Q'&&heroId==='ashe';if(instant){game.cast(key,targetPoint.x,targetPoint.z,selected?.id);processEvents();return;}if(armed===key){castAt(key,targetPoint.x,targetPoint.z);return;}armed=key;const skill=CHAMPIONS.find(h=>h.id===heroId).skills.find(s=>s.key===key);toast(`${key} ${skill?.name||({D:'闪现',F:'引燃'})[key]} · 点击目标施放，右键取消`,2500);}
-function castAt(key,x,z,id){if(key==='4')game.placeWard(x,z);else if(key==='A'){if(game.attackMove)game.attackMove(x,z);else game.moveTo(x,z);}else game.cast(key,x,z,id||entityAt(x,z)?.id);armed=null;aim.visible=false;processEvents();}
+function armSkill(key){if(!running||paused||!game.player.alive)return;if(key==='A'||key==='4'){armed=key;updateCursor();toast(key==='A'?'左键点敌人精准攻击，点地面攻击移动':'点击目标位置放置侦查守卫',2200);return;}const instant=(heroId==='garen'&&['Q','W','E'].includes(key))||key==='W'&&heroId==='ahri'||key==='Q'&&heroId==='ashe';if(instant){game.cast(key,targetPoint.x,targetPoint.z,selected?.id);processEvents();return;}if(armed===key){castAt(key,targetPoint.x,targetPoint.z);return;}armed=key;updateCursor();const skill=CHAMPIONS.find(h=>h.id===heroId).skills.find(s=>s.key===key);toast(`${key} ${skill?.name||({D:'闪现',F:'引燃'})[key]} · 点击目标施放，右键取消`,2500);}
+function castAt(key,x,z,id){
+ if(key==='4')game.placeWard(x,z);
+ else if(key==='A'){
+   const target=game.getEntity(id);
+   if(target&&target.team!==game.player.team){selected=target;game.attackMove(x,z,target.id);actors.pulse(target.x,target.z,0xff6f76,2,.45);}
+   else{selected=null;game.attackMove(x,z);actors.pulse(x,z,0xffa76f,.7,.5);}
+ }else game.cast(key,x,z,id||entityAt(x,z)?.id);
+ armed=null;aim.visible=false;updateCursor();processEvents();
+}
+function castAtPointer(key){const point=pointerPoint(mouse.x,mouse.y),target=entityAtPointer(mouse.x,mouse.y,point);castAt(key,point.x,point.z,target?.id);}
 function pointerPoint(clientX,clientY){ndc.set(clientX/width*2-1,-clientY/height*2+1);ray.setFromCamera(ndc,camera);if(ray.ray.intersectPlane(plane,rayPoint)){targetPoint={x:THREE.MathUtils.clamp(rayPoint.x,-123,123),z:THREE.MathUtils.clamp(rayPoint.z,-123,123)};}return targetPoint;}
 function entityAt(x,z){let nearest=null,d=Infinity;for(const e of game.entities){if(!e.alive||e.id===game.player.id||(e.kind==='ward'&&e.team==='blue')||(e.team!=='blue'&&game.isVisible&&!game.isVisible(e)))continue;const dist=Math.hypot(e.x-x,e.z-z),r=e.radius||(e.kind==='tower'?4:e.kind==='nexus'?7:e.kind==='monster'?4:e.kind==='hero'?2.8:1.9);if(dist<r+1.2&&dist<d){nearest=e;d=dist;}}return nearest;}
-canvas.addEventListener('contextmenu',e=>e.preventDefault());canvas.addEventListener('pointermove',e=>{mouse={x:e.clientX,y:e.clientY,inside:true};pointerPoint(e.clientX,e.clientY);});canvas.addEventListener('pointerleave',()=>mouse.inside=false);
-canvas.addEventListener('pointerdown',e=>{if(!running||paused||ended)return;e.preventDefault();const p=pointerPoint(e.clientX,e.clientY);const ent=entityAt(p.x,p.z);if(e.button===2){if(armed){armed=null;aim.visible=false;return;}if(ent&&ent.team!=='blue'){selected=ent;game.attackTarget(ent.id);actors.pulse(ent.x,ent.z,0xff6f76,2);}else{game.moveTo(p.x,p.z);actors.pulse(p.x,p.z,0x5af1b5,.65,.55);}return;}if(armed){castAt(armed,p.x,p.z,ent?.id);return;}if(e.pointerType==='touch'){if(ent&&ent.team!=='blue'){selected=ent;game.attackTarget(ent.id);}else game.moveTo(p.x,p.z);actors.pulse(p.x,p.z,0x5af1b5,.6,.5);}else selected=ent;});
+function entityAtPointer(clientX,clientY,point=pointerPoint(clientX,clientY)){
+ // Pick the visible 3D body, including raised heads and tower crystals.
+ const meshes=[];
+ for(const e of game.entities){const actor=actors.map.get(e.id);if(!e.alive||e.id===game.player.id||!actor?.mesh.visible||e.kind==='ward'&&e.team==='blue'||game.isVisible&&!game.isVisible(e))continue;
+   if(Math.hypot(e.x-point.x,e.z-point.z)<(e.radius||2)+16)meshes.push(actor.mesh);
+ }
+ for(const hit of ray.intersectObjects(meshes,true)){
+   let object=hit.object;if(!object.visible)continue;
+   while(object&&!object.userData.entityId)object=object.parent;
+   const e=game.getEntity(object?.userData.entityId);if(e)return e;
+ }
+ return entityAt(point.x,point.z);
+}
+function updateCursor(){
+ const kind=!running||paused||ended?'default':cameraGesture?.active?'drag':armed==='A'?'attack':armed==='4'?'ward':armed?'aim':hovered&&hovered.team!==game.player.team?'attack':'move';
+ if(canvas.dataset.cursor!==kind)canvas.dataset.cursor=kind;
+}
+function cancelCameraGesture(){
+ if(cameraGesture&&canvas.hasPointerCapture(cameraGesture.id))canvas.releasePointerCapture(cameraGesture.id);
+ cameraGesture=null;updateCursor();
+}
+canvas.addEventListener('contextmenu',e=>e.preventDefault());
+canvas.addEventListener('auxclick',e=>{if(e.button===1)e.preventDefault();});
+window.addEventListener('pointermove',e=>{
+ mouse={x:e.clientX,y:e.clientY,inside:e.target===canvas};
+ if(!cameraGesture)return;
+ const dx=e.clientX-cameraGesture.x,dy=e.clientY-cameraGesture.y;
+ if(!cameraGesture.active&&Math.hypot(dx,dy)<4)return;
+ if(!cameraGesture.active){cameraGesture.active=true;locked=false;updateCameraButton();}
+ const center=cameraDrag(cameraGesture.origin,dx,dy,zoom,height);cameraCenter.set(center.x,0,center.z);
+ updateCursor();e.preventDefault();
+});
+canvas.addEventListener('pointerleave',()=>{mouse.inside=false;hovered=null;updateCursor();});
+canvas.addEventListener('pointerdown',e=>{
+ if(!running||paused||ended)return;e.preventDefault();const p=pointerPoint(e.clientX,e.clientY),ent=entityAtPointer(e.clientX,e.clientY,p);
+ if(e.button===1){cameraGesture={id:e.pointerId,x:e.clientX,y:e.clientY,origin:{x:cameraCenter.x,z:cameraCenter.z},active:true};locked=false;canvas.setPointerCapture(e.pointerId);updateCameraButton();updateCursor();return;}
+ if(e.button===2){cancelCameraGesture();if(armed){armed=null;aim.visible=false;updateCursor();return;}
+   if(ent&&ent.team!=='blue'){selected=ent;game.attackTarget(ent.id);actors.pulse(ent.x,ent.z,0xff6f76,2);}
+   else{game.moveTo(p.x,p.z);actors.pulse(p.x,p.z,0x5af1b5,.65,.55);}return;
+ }
+ if(armed){castAt(armed,p.x,p.z,ent?.id);return;}
+ if(e.pointerType==='touch'){if(ent&&ent.team!=='blue'){selected=ent;game.attackTarget(ent.id);}else game.moveTo(p.x,p.z);actors.pulse(p.x,p.z,0x5af1b5,.6,.5);}
+ else{selected=ent;if(!ent){cameraGesture={id:e.pointerId,x:e.clientX,y:e.clientY,origin:{x:cameraCenter.x,z:cameraCenter.z},active:false};canvas.setPointerCapture(e.pointerId);}}
+});
+window.addEventListener('pointerup',cancelCameraGesture);
+canvas.addEventListener('pointercancel',cancelCameraGesture);
+canvas.addEventListener('lostpointercapture',()=>{cameraGesture=null;updateCursor();});
 canvas.addEventListener('wheel',e=>{e.preventDefault();if(!running)return;zoom=THREE.MathUtils.clamp(zoom+e.deltaY*.04,35,115);resize();},{passive:false});
 minimap.addEventListener('contextmenu',e=>e.preventDefault());minimap.addEventListener('pointerdown',e=>{if(!running||paused)return;const r=minimap.getBoundingClientRect(),x=(e.clientX-r.left)/r.width*256-128,z=(e.clientY-r.top)/r.height*256-128;if(e.button===2||e.pointerType==='touch'&&armed==='A')game.moveTo(x,z);else{locked=false;cameraCenter.set(x,0,z);updateCameraButton();}});
 const pressed=new Set();window.addEventListener('keydown',e=>{if(e.target.matches('input,textarea'))return;const k=e.key.toUpperCase();if(['TAB',' ','ARROWUP','ARROWDOWN','ARROWLEFT','ARROWRIGHT'].includes(k))e.preventDefault();if(e.repeat&&![' ','ARROWUP','ARROWDOWN','ARROWLEFT','ARROWRIGHT'].includes(k))return;pressed.add(k);
  if(k==='ESCAPE'){if(armed){armed=null;return;}if(!$('help-panel').classList.contains('hidden')){show('help-panel',false);return;}if(!$('shop-panel').classList.contains('hidden')){show('shop-panel',false);return;}setPause(!paused);return;}if(!running||paused||ended)return;
- if('QWER'.includes(k)&&k.length===1){if(e.ctrlKey){e.preventDefault();game.levelSkill?.(k);}else if(e.shiftKey){castAt(k,targetPoint.x,targetPoint.z);}else armSkill(k);}
- if(k==='D')castAt('D',targetPoint.x,targetPoint.z);if(k==='F')castAt('F',targetPoint.x,targetPoint.z,selected?.id);if(k==='4')armSkill('4');if(k==='A')armSkill('A');if(k==='S'){game.stop();armed=null;}if(k==='B'){game.recall();processEvents();}if(k==='P')openShop();if(k==='Y'){locked=!locked;updateCameraButton();}if(k===' '){cameraCenter.set(game.player.x,0,game.player.z);}
+ if('QWER'.includes(k)&&k.length===1){if(e.ctrlKey){e.preventDefault();game.levelSkill?.(k);}else if(e.shiftKey){castAtPointer(k);}else armSkill(k);}
+ if(k==='D')castAtPointer('D');if(k==='F')castAtPointer('F');if(k==='4')armSkill('4');if(k==='A'){if(e.shiftKey){const point=pointerPoint(mouse.x,mouse.y);castAt('A',point.x,point.z,entityAtPointer(mouse.x,mouse.y,point)?.id);}else armSkill('A');}if(k==='S'){game.stop();armed=null;}if(k==='B'){game.recall();processEvents();}if(k==='P')openShop();if(k==='Y'){locked=!locked;updateCameraButton();}if(k===' '){cameraCenter.set(game.player.x,0,game.player.z);}
  if(k==='TAB'){renderScoreboard();show('scoreboard');}const itemKeys=['1','2','3','5','6','7'];if(itemKeys.includes(k))game.useItem(itemKeys.indexOf(k),targetPoint.x,targetPoint.z);
-});window.addEventListener('keyup',e=>{pressed.delete(e.key.toUpperCase());if(e.key==='Tab')show('scoreboard',false);});window.addEventListener('blur',()=>pressed.clear());
+});window.addEventListener('keyup',e=>{pressed.delete(e.key.toUpperCase());if(e.key==='Tab')show('scoreboard',false);});window.addEventListener('blur',()=>{pressed.clear();mouse.inside=false;cancelCameraGesture();});
 function updateCameraButton(){txt('camera-button',locked?'跟随':'自由');$('camera-button')?.classList.toggle('active',locked);}
 $('start-game').addEventListener('click',start);$('shop-button').addEventListener('click',openShop);$('shop-close').addEventListener('click',()=>show('shop-panel',false));$('ward-button').addEventListener('click',()=>armSkill('4'));$('recall-button').addEventListener('click',()=>{game.recall();processEvents();});$('help-button').addEventListener('click',()=>show('help-panel'));$('help-close').addEventListener('click',()=>show('help-panel',false));$('pause-button').addEventListener('click',()=>setPause(!paused));$('resume-button').addEventListener('click',()=>setPause(false));$('restart-button').addEventListener('click',start);$('play-again').addEventListener('click',start);$('lobby-button').addEventListener('click',()=>{running=false;paused=false;show('pause-panel',false);show('hud',false);show('lobby');document.body.classList.remove('in-game');armed=null;});$('camera-button').addEventListener('click',()=>{locked=!locked;updateCameraButton();});$('sound-button').addEventListener('click',()=>{sound=!sound;txt('sound-button',sound?'声音 开':'声音 关');if(sound){initAudio();soundEvent('start');}});
 let toastTimer;function toast(message,duration=3000){txt('toast',message);show('toast');clearTimeout(toastTimer);toastTimer=setTimeout(()=>show('toast',false),duration);}
@@ -77,14 +133,20 @@ let audio;function initAudio(){if(!audio)audio=new(window.AudioContext||window.w
 function soundEvent(type){if(!sound)return;try{initAudio();const tones={spell:[460,720,.08],gold:[950,1400,.08],purchase:[500,800,.18],level:[550,1100,.25],start:[210,430,.6]};const [start,end,duration]=tones[type]||[330,200,.1];const oscillator=audio.createOscillator(),gain=audio.createGain();oscillator.type=type==='spell'?'sine':'triangle';oscillator.frequency.setValueAtTime(start,audio.currentTime);oscillator.frequency.exponentialRampToValueAtTime(end,audio.currentTime+duration);gain.gain.setValueAtTime(.035,audio.currentTime);gain.gain.exponentialRampToValueAtTime(.0001,audio.currentTime+duration);oscillator.connect(gain);gain.connect(audio.destination);oscillator.start();oscillator.stop(audio.currentTime+duration);}catch{}}
 function frame(){requestAnimationFrame(frame);const rawDt=clock.getDelta(),dt=Math.min(rawDt,.2);total+=dt;fpsTime+=rawDt;fpsFrames++;if(fpsTime>1){txt('fps',Math.round(fpsFrames/fpsTime));fpsFrames=0;fpsTime=0;}
  if(running&&!paused&&!ended){for(let remaining=dt;remaining>0.0001;remaining-=.05)game.update(Math.min(.05,remaining));processEvents();hudTime+=dt;if(hudTime>.1){updateHud();mapRender();hudTime=0;}}
- if(running){if(locked||pressed.has(' '))cameraCenter.lerp(new THREE.Vector3(game.player.x,0,game.player.z),Math.min(1,dt*8));else if(!paused&&mouse.inside){const margin=13,speed=dt*zoom*.7;if(mouse.x<margin||pressed.has('ARROWLEFT'))cameraCenter.x-=speed;if(mouse.x>width-margin||pressed.has('ARROWRIGHT'))cameraCenter.x+=speed;if(mouse.y<margin||pressed.has('ARROWUP'))cameraCenter.z-=speed;if(mouse.y>height-margin||pressed.has('ARROWDOWN'))cameraCenter.z+=speed;cameraCenter.x=THREE.MathUtils.clamp(cameraCenter.x,-120,120);cameraCenter.z=THREE.MathUtils.clamp(cameraCenter.z,-120,120);}}
- else cameraCenter.lerp(new THREE.Vector3(-5,0,12),.01);
- if(running){const halfX=zoom*width/height/2;cameraCenter.x=THREE.MathUtils.clamp(cameraCenter.x,-126+Math.min(halfX,60),126-Math.min(halfX,60));cameraCenter.z=THREE.MathUtils.clamp(cameraCenter.z,-82,82);}
+ if(running&&!paused&&!ended){
+   const pan= cameraGesture?{x:0,z:0}:cameraPan(mouse,{width,height},pressed,zoom,dt);
+   if(pressed.has(' ')){cancelCameraGesture();cameraCenter.set(game.player.x,0,game.player.z);}
+   else if(pan.x||pan.z){if(locked){locked=false;updateCameraButton();}cameraCenter.x+=pan.x;cameraCenter.z+=pan.z;}
+   else if(locked&&!cameraGesture)cameraCenter.lerp(new THREE.Vector3(game.player.x,0,game.player.z),1-Math.exp(-dt*15));
+ }
+ else if(!running)cameraCenter.lerp(new THREE.Vector3(-5,0,12),.01);
+ if(running){cameraCenter.x=THREE.MathUtils.clamp(cameraCenter.x,-120,120);cameraCenter.z=THREE.MathUtils.clamp(cameraCenter.z,-120,120);}
  camera.position.copy(cameraCenter).add(new THREE.Vector3(0,110,86));camera.lookAt(cameraCenter);camera.updateMatrixWorld();
+ if(running&&mouse.inside&&!cameraGesture){const point=pointerPoint(mouse.x,mouse.y);hovered=entityAtPointer(mouse.x,mouse.y,point);}else hovered=null;updateCursor();
  world.update(total,paused?0:dt);actors.sync(game,paused?0:dt,total,camera,width,height,running);
  aim.visible=running&&!!armed&&!paused;if(aim.visible){aim.position.set(game.player.x,.24,game.player.z);const range=armed==='4'?28:armed==='D'?22:armed==='A'?game.player.attackRange||15:CHAMPIONS.find(h=>h.id===heroId).skills.find(s=>s.key===armed)?.range||35;aimCircle.scale.setScalar(range/10);aimGeometry.attributes.position.setXYZ(1,targetPoint.x-game.player.x,0,targetPoint.z-game.player.z);aimGeometry.attributes.position.needsUpdate=true;aimGeometry.computeBoundingSphere();}
  renderer.render(scene,camera);
 }
 populateLobby();resize();show('loading-screen',false);txt('ping','本地对局');requestAnimationFrame(frame);
 // A small read-only diagnostics surface supports browser verification and performance review.
-window.__rift={get game(){return game;},get renderer(){return renderer;},get camera(){return camera;},get scene(){return scene;},get world(){return world;},get running(){return running;},get paused(){return paused;},get armed(){return armed;},get hero(){return heroId;},start,chooseHero,worldToScreen(x,z){const p=new THREE.Vector3(x,0,z).project(camera);return{x:(p.x*.5+.5)*width,y:(-p.y*.5+.5)*height};}};
+window.__rift={get game(){return game;},get renderer(){return renderer;},get camera(){return camera;},get scene(){return scene;},get world(){return world;},get running(){return running;},get paused(){return paused;},get armed(){return armed;},get hero(){return heroId;},get cameraLocked(){return locked;},get cameraCenter(){return{x:cameraCenter.x,z:cameraCenter.z};},start,chooseHero,worldToScreen(x,z,y=0){const p=new THREE.Vector3(x,y,z).project(camera);return{x:(p.x*.5+.5)*width,y:(-p.y*.5+.5)*height};}};

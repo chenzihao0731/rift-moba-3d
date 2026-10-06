@@ -31,3 +31,27 @@
 @media(prefers-reduced-motion:reduce){*,*:before,*:after{animation-duration:.001ms!important;transition-duration:.001ms!important}}
 
 .skill-icon img,.item-slot .item-icon img,.shop-item-icon img{display:block;width:100%;height:100%;object-fit:cover;pointer-events:none}.skill-icon{overflow:hidden}.shop-item-icon{padding:0;overflow:hidden}.item-slot .item-icon{position:absolute;inset:2px;display:block}.item-slot .item-key{z-index:3;background:#04131dcc}.item-slot{overflow:hidden}
+
+/* Native cursors keep the command hotspot precise and responsive at any frame rate. */
+body.in-game #game-canvas,
+body.in-game #game-canvas[data-cursor="move"] {
+  cursor: url('./assets/cursors/move.svg') 4 3, default;
+}
+body.in-game #game-canvas[data-cursor="attack"] {
+  cursor: url('./assets/cursors/attack.svg') 4 3, crosshair;
+}
+body.in-game #game-canvas[data-cursor="aim"] {
+  cursor: url('./assets/cursors/aim.svg') 16 16, crosshair;
+}
+body.in-game #game-canvas[data-cursor="ward"] {
+  cursor: url('./assets/cursors/ward.svg') 16 16, crosshair;
+}
+body.in-game #game-canvas[data-cursor="grab"] {
+  cursor: grab;
+}
+body.in-game #game-canvas[data-cursor="drag"] {
+  cursor: grabbing;
+}
+body.in-game #minimap {
+  cursor: pointer;
+}
