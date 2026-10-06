@@ -199,6 +199,35 @@ export class CombatEffects {
     }
   }
 
+  cone(from, to, color, radius = 14, duration = .65) {
+    const direction = to.clone().sub(from), angle = Math.atan2(direction.x, direction.z), length = Math.min(55, Math.max(5, direction.length())), group = new THREE.Group();
+    group.position.set(from.x, .6, from.z);group.rotation.y=angle;
+    for(let i=-3;i<=3;i++){
+      const blade=this.mesh(group,'thrust',color,.26+(.3-Math.abs(i)*.06));
+      blade.rotation.y=i*.17;blade.scale.set(.55,1,length);
+      const end=new THREE.Vector3(from.x+Math.sin(angle+i*.17)*length,1.4,from.z+Math.cos(angle+i*.17)*length);
+      this.lineBurst(new THREE.Vector3(from.x,1.2,from.z),end,color,7,.35,duration);
+    }
+    group.userData.shape='cone';this.add(group,duration,(_,t)=>group.scale.z=.45+Math.min(1,t*4)*.55);
+  }
+
+  impact(x,z,color,radius=7,theme='magic'){
+    this.ring(x,z,color,radius,.8);this.burst(x,.8,z,color,55,12,.9,theme==='fire'?7:0);
+    if(theme==='ice')this.crystals(x,z,color,radius*.6,.8);
+    else if(theme==='fire')this.burst(x,1.2,z,0xffe0a8,25,8,.7,8);
+    else this.rune(x,z,color,radius*.85,.75);
+  }
+
+  shark(x,z,color=0x71d5e7){
+    const group=new THREE.Group();group.position.set(x,-2,z);group.name='fizz-shark-emerge';
+    const body=this.mesh(group,'sphere',color,.85);body.position.y=1.6;body.scale.set(2.2,2.6,4.2);
+    const belly=this.mesh(group,'sphere',0xe1fff4,.78);belly.position.set(0,.8,2.6);belly.scale.set(1.9,1.3,1.4);
+    const fin=this.mesh(group,'crystal',color,.8);fin.position.set(0,4.5,-.6);fin.scale.set(.35,1.7,1.2);
+    for(const side of[-1,1]){const eye=this.mesh(group,'sphere',0x102b36,1);eye.position.set(side*1.5,2.2,2.9);eye.scale.set(.17,.2,.15);for(let i=0;i<5;i++){const tooth=this.mesh(group,'crystal',0xffffff,.92);tooth.position.set(side*(.4+i*.23),.9,3.7-i*.14);tooth.scale.set(.13,.4,.13);}}
+    this.add(group,1.25,(_,t)=>{group.position.y=-2+Math.sin(t*Math.PI)*5.8;group.rotation.x=-Math.sin(t*Math.PI)*.12;});
+    this.ring(x,z,color,9,1.1);this.burst(x,.1,z,color,65,13,1.1,9);
+  }
+
   crystals(x, z, color, radius = 5, duration = .85) {
     const group = new THREE.Group();
     group.position.set(x, 0, z);

@@ -38,29 +38,34 @@
       <header class="lobby-topline">
         <div class="lobby-wordmark"><span class="brand-rune">R</span><span>RIFT<span class="brand-number">3D</span></span></div>
         <span class="lobby-edition">召唤师峡谷 <i></i> 战术竞技</span>
-        <div class="lobby-live"><span></span> 峡谷已就绪</div>
+        <div class="collection-wallet"><span class="essence-gem">◆</span><strong id="profile-essence">6,000</strong><small>蓝色精粹</small><button id="daily-supply" class="supply-button">每日补给 +1,200</button></div>
       </header>
 
       <div class="lobby-intro">
         <div class="eyebrow"><span></span> WELCOME TO SUMMONER’S RIFT</div>
-        <h1>每一步，<br />都通往<span>胜利。</span></h1>
-        <p>选择你的英雄，踏入 3D 召唤师峡谷。<br />补刀发育、掌控视野，与队伍一起摧毁敌方水晶。</p>
-        <div class="lobby-pillars"><span>三路战场</span><i></i><span>野区争夺</span><i></i><span>八种英雄玩法</span></div>
+        <h1>你的英雄，<span>你的传奇。</span></h1>
+        <p>解锁新的战斗风格，穿上你的专属皮肤，再次征服峡谷。</p>
+        <div class="lobby-pillars"><span id="roster-count">24 位英雄</span><i></i><span id="equipment-count">装备工坊</span><i></i><span>原创主题皮肤</span></div>
       </div>
 
       <div class="hero-selection">
-        <div class="selection-heading"><span class="section-index">01</span><h2>选择你的英雄</h2><span class="selection-hint">CHOOSE YOUR CHAMPION</span></div>
+        <div class="selection-heading"><span class="section-index">01</span><h2>英雄收藏</h2><span id="collection-count" class="selection-hint">已拥有 3 / 24</span></div>
+        <div class="roster-toolbar"><label class="roster-search"><svg><use href="#i-eye"/></svg><input id="hero-search" placeholder="搜索英雄、技能或玩法" aria-label="搜索英雄" autocomplete="off"></label><nav id="hero-filters" class="hero-filters" aria-label="英雄分类"><button data-role="all" class="active">全部</button><button data-role="owned">已拥有</button><button data-role="战士">战士</button><button data-role="法师">法师</button><button data-role="射手">射手</button><button data-role="坦克">坦克</button><button data-role="辅助">辅助</button></nav></div>
         <div id="hero-grid" class="hero-grid"></div>
-        <div class="selected-hero-details"><div><h3 id="hero-title">九尾妖狐 · 阿狸</h3><p id="hero-description">灵巧的法师。用法球消耗敌人，魅惑控制，再用灵魄突袭完成击杀。</p><p id="hero-combo" class="hero-combo">E 魅惑 → Q 宝珠 → W 狐火 → R 突袭</p></div><span class="hero-choice-mark">◆</span></div>
+        <div class="selected-hero-details collection-details">
+          <div class="skin-preview"><canvas id="hero-preview" aria-label="英雄皮肤 3D 预览，可拖动旋转"></canvas><span class="preview-caption">3D 外观 · 拖动旋转</span><span id="preview-theme" class="preview-theme">经典外观</span></div>
+          <div class="hero-detail-content"><div class="detail-title"><h3 id="hero-title">阿狸</h3><span id="hero-ownership" class="ownership-tag">已拥有</span></div><p id="hero-description"></p><p id="hero-combo" class="hero-combo"></p><p id="hero-passive" class="hero-passive"></p><div id="hero-skills-preview" class="hero-skills-preview"></div><p id="hero-skill-description" class="hero-skill-description"></p><button id="unlock-hero" class="unlock-button hidden"></button><div class="skin-section"><div class="skin-section-heading"><h4>英雄衣橱</h4><span>外观不影响属性</span></div><div id="skin-options" class="skin-options"></div><p id="skin-description"></p><button id="skin-action" class="skin-action hidden"></button></div></div>
+        </div>
       </div>
 
       <footer class="lobby-footer">
-        <label class="practice-option"><input id="practice-toggle" type="checkbox" /><span class="custom-check"></span><span>练习模式<small>自由熟悉技能与地图</small></span></label>
+        <label class="practice-option"><input id="practice-toggle" type="checkbox" /><span class="custom-check"></span><span>练习模式<small>所有英雄免费试用 · 不获精粹</small></span></label>
         <label class="cast-setting">施法方式<select id="lobby-cast-mode" data-cast-selector aria-label="施法方式"><option value="manual">手动施法</option><option value="smart">智能施法</option></select><small id="cast-mode-description"></small></label>
         <p class="lobby-key-hint"><kbd>右键</kbd> 移动与攻击 <span>·</span> <kbd>Q W E R</kbd> 释放技能 <span>·</span> <kbd>P</kbd> 购买装备</p>
         <button id="start-game" class="primary-button"><span>进入峡谷</span><svg><use href="#i-arrow"/></svg></button>
       </footer>
-      <div class="lobby-bottom-note">单人即时对战 · 八位可操控英雄 · 原创 3D 场景</div>
+      <div class="lobby-bottom-note">新玩家赠送 6,000 精粹 · 对战与每日补给获取更多 · 收藏保存在当前浏览器</div>
+      <details class="essence-rules"><summary>如何获取蓝色精粹？</summary><p>每日补给 +1,200。普通对局每分钟 +60、每次补刀 +2、击杀 +30、助攻 +15，战斗奖励每局最多 1,200；结束后胜利额外 +1,500，失败 +900。练习模式免费试用英雄，不发放精粹。</p></details>
     </section>
 
     <div id="hud" class="hidden">
@@ -122,7 +127,7 @@
 
     <section id="pause-panel" class="overlay modal-overlay hidden" aria-label="游戏已暂停"><div class="pause-window modal-window"><div class="pause-rune">Ⅱ</div><span class="eyebrow">TAKE A BREATH</span><h2>战场已暂停</h2><p>稍作调整，准备下一次出击。</p><label class="cast-setting pause-cast-setting">施法方式<select id="pause-cast-mode" data-cast-selector aria-label="暂停菜单施法方式"><option value="manual">手动施法</option><option value="smart">智能施法</option></select><small>Shift + 技能临时使用另一种施法</small></label><button id="resume-button" class="primary-button">继续战斗<svg><use href="#i-play"/></svg></button><button id="restart-button" class="secondary-button">重新开始</button><button id="lobby-button" class="text-button">返回英雄选择</button><small><kbd>Esc</kbd> 继续游戏</small></div></section>
 
-    <section id="end-panel" class="overlay modal-overlay hidden" aria-label="对局结束"><div class="end-window modal-window"><span class="eyebrow">THE RIFT REMEMBERS</span><div class="victory-ornament"><span></span><b>◆</b><span></span></div><h2 id="end-title">胜利</h2><p class="end-subtitle">每一场战斗，都是传奇的一页。</p><div id="end-stats" class="end-stats"></div><button id="play-again" class="primary-button">再次征战<svg><use href="#i-arrow"/></svg></button></div></section>
+    <section id="end-panel" class="overlay modal-overlay hidden" aria-label="对局结束"><div class="end-window modal-window"><span class="eyebrow">THE RIFT REMEMBERS</span><div class="victory-ornament"><span></span><b>◆</b><span></span></div><h2 id="end-title">胜利</h2><p class="end-subtitle">每一场战斗，都是传奇的一页。</p><div id="end-stats" class="end-stats"></div><p id="match-reward" class="match-reward"></p><button id="play-again" class="primary-button">再次征战<svg><use href="#i-arrow"/></svg></button><button id="end-lobby-button" class="text-button">返回收藏，解锁英雄与皮肤</button></div></section>
 
     <section id="scoreboard" class="overlay scoreboard-overlay hidden" aria-label="战况面板"><div class="scoreboard-window modal-window"><div class="scoreboard-title"><span class="eyebrow">MATCH OVERVIEW</span><h2>对局战况</h2><small>松开 <kbd>Tab</kbd> 返回战场</small></div><div id="scoreboard-body"></div></div></section>
 

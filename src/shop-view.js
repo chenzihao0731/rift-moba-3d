@@ -1,8 +1,30 @@
 import { ITEMS } from './item-data.js';
+import './shop-polish.css';
 
 const byId = new Map(ITEMS.map(item => [item.id, item]));
 const keys = ['1', '2', '3', '5', '6', '7'];
-const category = item => item.active === 'heal' || item.active === 'ward' ? 'consumables' : item.component ? 'components' : 'equipment';
+const category = item => item.category === 'consumable' ? 'consumables' : item.component ? 'components' : 'equipment';
+const tags = { ad:'物理 攻击 射手 攻速 暴击', ap:'魔法 法师 法强', tank:'坦克 生命 护甲 防御', support:'辅助 治疗 护盾', mr:'魔抗 魔法抗性', penetration:'穿甲 破甲 护甲穿透' };
+const mageIds = new Set(['ahri','lux','teemo','annie','syndra','veigar','orianna','brand','viktor','xerath','fizz','akali','katarina','diana','aurelionsol']);
+const marksmanIds = new Set(['ashe','ezreal','jinx','caitlyn','vayne','missfortune','lucian','tristana','jhin','kaisa','varus','twitch','sivir']);
+const supportIds = new Set(['sona','soraka','nami','lulu','janna','seraphine','morgana','thresh','leona','blitzcrank','braum','yuumi']);
+
+export function recommendedItems(hero = {}) {
+  const id = hero.heroId || hero.id || '', role = hero.role || '';
+  if (id === 'ezreal') return ['doran-blade','boots','sheen','trinity-force','ionian-boots','blade-ruined','mortal-reminder','maw','quicksilver-sash'];
+  if (['yasuo','yone','masteryi'].includes(id)) return ['doran-blade','boots','berserkers','blade-ruined','infinity','phantom-dancer','steraks','deaths-dance','mercurial-scimitar'];
+  if (supportIds.has(id) || /辅助/.test(role)) return ['doran-ring','boots','ionian-boots','locket','redemption','shurelya','moonstone','mikaels','staff-flowing-water','ardent-censer'];
+  if (mageIds.has(id) || /法师|法术/.test(role)) return ['doran-ring','boots','sorcerer-shoes','lost-chapter','ludens','rabadon','void-staff','zhonya','morellonomicon','banshee',...(id==='teemo'?['nashors-tooth','liandry']:[])];
+  if (marksmanIds.has(id) || /射手/.test(role) || hero.attackRange > 15) return ['doran-blade','boots','berserkers','kraken-slayer','infinity','phantom-dancer','blade-ruined','lord-dominik','runaans','mercurial-scimitar'];
+  if (/刺客/.test(role) || ['zed','talon','khazix','rengar'].includes(id)) return ['doran-blade','boots','serrated-dirk','collector','black-cleaver','ionian-boots','maw','deaths-dance','ravenous-hydra'];
+  return ['doran-blade','boots','mercury-treads','plated-steelcaps','black-cleaver','trinity-force','steraks','sunfire','spirit-visage','thornmail','warmogs'];
+}
+
+export function itemMatchesQuery(item, query = '') {
+  const words = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  const text = [item.name, item.id, item.description, ...(item.recipe || []).map(id=>byId.get(id)?.name || id), ...(item.tags || []).map(tag=>tags[tag] || tag)].join(' ').toLowerCase();
+  return words.every(word=>text.includes(word));
+}
 
 export class ShopView {
   constructor(getGame, baseUrl, onChange) {
@@ -11,6 +33,8 @@ export class ShopView {
     this.onChange = onChange;
     this.selectedSlot = -1;
     this.filter = 'equipment';
+    this.statFilter = 'all';
+    this.query = '';
     this.items = document.getElementById('shop-items');
     this.inventory = document.getElementById('shop-inventory');
     this.filters = document.getElementById('shop-filters');
@@ -19,20 +43,27 @@ export class ShopView {
       if (this.getGame().sell(this.selectedSlot)) this.onChange();
       this.update();
     });
-    this.filters.innerHTML = [['equipment', '成装与出门装'], ['components', '合成散件'], ['consumables', '药水与守卫'], ['all', '全部']].map(([id, name]) => `<button data-filter="${id}" aria-pressed="false">${name}</button>`).join('');
+    this.filters.innerHTML = `<div class="shop-search-row"><label class="shop-search"><span>搜索装备</span><input id="shop-search" type="search" placeholder="名称、属性或配方，如：魔抗" aria-label="搜索装备名称、属性或合成部件" autocomplete="off"></label><label class="shop-stat-label"><span class="sr-only-shop">属性分类</span><select id="shop-stat-filter" aria-label="装备属性分类"><option value="all">全部属性</option><option value="ad">物理 / 攻速</option><option value="ap">法术强度</option><option value="tank">生命 / 防御</option><option value="support">辅助 / 治疗</option><option value="mr">魔法抗性</option><option value="penetration">护甲穿透</option></select></label></div><div class="shop-filter-tabs">${[['recommended','英雄推荐'],['equipment', '成装与出门装'], ['components', '合成散件'], ['consumables', '药水与守卫'], ['all', '全部']].map(([id, name]) => `<button data-filter="${id}" aria-pressed="false">${name}</button>`).join('')}</div><p class="shop-result-summary" aria-live="polite"></p>`;
+    this.filters.querySelector('#shop-search').addEventListener('input',event=>{
+      this.query=event.target.value;
+      // Search across the full catalog rather than silently excluding hidden categories.
+      if(this.query.trim())this.filter='all';
+      this.applyFilter();this.update();
+    });
+    this.filters.querySelector('#shop-stat-filter').addEventListener('change',event=>{this.statFilter=event.target.value;this.applyFilter();this.update();});
     this.filters.addEventListener('click', event => {
       const button = event.target.closest('[data-filter]');
       if (!button) return;
       this.filter = button.dataset.filter;
-      this.applyFilter();
+      this.applyFilter();this.update();
     });
     this.items.innerHTML = ITEMS.map(item => {
       const recipe = (item.recipe || []).map(id => byId.get(id)?.name || id).join(' + ');
-      return `<button class="item-card" data-item="${item.id}" data-category="${category(item)}"><span class="shop-item-icon"><img src="${baseUrl}assets/item-${item.id}.png" alt="" draggable="false"></span><span class="shop-item-info"><strong>${item.name}</strong><small>${item.description}</small>${recipe ? `<span class="item-recipe">合成：${recipe}</span>` : ''}<span class="item-pricing"><span class="item-cost"></span><del class="item-full-cost"></del></span><span class="item-owned"></span><span class="item-buy-state"></span></span></button>`;
+      return `<button class="item-card" data-item="${item.id}" data-category="${category(item)}"><span class="shop-item-icon"><img src="${baseUrl}assets/item-${item.id}.png" alt="" draggable="false" loading="lazy"></span><span class="shop-item-info"><strong>${item.name}<span class="item-recommended-mark" aria-hidden="true">荐</span></strong><small>${item.description}</small>${recipe ? `<span class="item-recipe">合成：${recipe}</span>` : ''}<span class="item-pricing"><span class="item-cost"></span><del class="item-full-cost"></del></span><span class="item-owned"></span><span class="item-buy-state"></span></span></button>`;
     }).join('');
     this.items.addEventListener('click', event => {
       const button = event.target.closest('[data-item]');
-      if (!button) return;
+      if (!button || button.disabled) return;
       if (this.getGame().buy(button.dataset.item)) this.onChange();
       this.update();
     });
@@ -43,36 +74,49 @@ export class ShopView {
       this.selectedSlot = Number(button.dataset.slot);
       this.update();
     });
+    const empty=document.createElement('p');empty.className='shop-no-results hidden';empty.textContent='没有找到装备，换个关键词或属性分类试试。';this.items.after(empty);this.empty=empty;
     this.applyFilter();
   }
 
   applyFilter() {
-    for (const button of this.filters.children) {
+    const hero=this.getGame().player,recommendations=new Set(recommendedItems(hero));this.lastHero=hero.heroId;
+    for (const button of this.filters.querySelectorAll('[data-filter]')) {
       const active = button.dataset.filter === this.filter;
       button.classList.toggle('active', active);
       button.setAttribute('aria-pressed', String(active));
     }
-    for (const button of this.items.children) button.classList.toggle('hidden', this.filter !== 'all' && button.dataset.category !== this.filter);
+    let count=0;
+    for (const button of this.items.children) {
+      const item=byId.get(button.dataset.item),recommended=recommendations.has(item.id);
+      const visible=(this.filter==='all'||this.filter==='recommended'&&recommended||button.dataset.category===this.filter)&&(this.statFilter==='all'||item.tags.includes(this.statFilter))&&itemMatchesQuery(item,this.query);
+      button.classList.toggle('hidden',!visible);button.classList.toggle('hero-recommended',recommended);if(visible)count++;
+    }
+    this.filters.querySelector('.shop-result-summary').textContent=`${count} 件装备${this.filter==='recommended'?' · 推荐可按对手阵容调整':''}`;
+    this.empty?.classList.toggle('hidden',count>0);
   }
 
-  render() { this.update(); }
+  render() { this.applyFilter();this.update(); }
 
   update() {
     const game = this.getGame(), hero = game.player;
     if (!game.quoteBuy) return;
+    if(this.lastHero!==hero.heroId)this.applyFilter();
     document.getElementById('shop-gold').textContent = Math.floor(hero.gold).toLocaleString();
     for (const button of this.items.children) {
+      if(button.classList.contains('hidden'))continue;
       const quote = game.quoteBuy(button.dataset.item);
       const item = byId.get(button.dataset.item);
+      const components = (quote.components || []).map(index => byId.get(hero.inventory[index]?.id)?.name).filter(Boolean);
+      const owned = components.length ? `抵扣 ${quote.discount} · ${components.join('、')}` : '';
+      const signature=JSON.stringify([quote.ok,quote.cost,quote.discount,quote.reason,owned]);if(button.dataset.quote===signature)continue;button.dataset.quote=signature;
       button.disabled = !quote.ok;
       button.classList.toggle('discounted', quote.discount > 0);
       button.querySelector('.item-cost').textContent = `${quote.cost ?? item.cost} 金币`;
       button.querySelector('.item-full-cost').textContent = quote.discount > 0 ? `${item.cost}` : '';
-      const components = (quote.components || []).map(index => byId.get(hero.inventory[index]?.id)?.name).filter(Boolean);
-      const owned = components.length ? `抵扣 ${quote.discount} · ${components.join('、')}` : '';
       button.querySelector('.item-owned').textContent = owned;
-      button.querySelector('.item-buy-state').textContent = quote.ok ? '点击购买' : quote.reason;
+      button.querySelector('.item-buy-state').textContent = quote.ok ? quote.discount?'点击合成':'点击购买' : quote.reason;
       button.title = `${item.name}\n${item.description}\n${owned}\n${quote.ok ? '点击购买，自动合成已有散件' : quote.reason}`;
+      button.setAttribute('aria-label',`${item.name}，${quote.cost} 金币，${owned}，${quote.ok?'可购买':quote.reason}`);
     }
     for (const button of this.inventory.children) {
       const index = Number(button.dataset.slot), slot = hero.inventory[index], item = byId.get(slot?.id);

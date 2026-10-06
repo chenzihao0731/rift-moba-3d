@@ -61,7 +61,7 @@ export function purchaseQuote(hero, itemId, { canShop = true } = {}) {
     missingGold: Math.max(0, cost - (Number.isFinite(hero?.gold) ? hero.gold : 0)) };
   if (!canShop) return failure(quote, 'away-from-shop', '请在己方泉水商店内购买装备');
   if (item.unique && inventory.some(value => value?.id === itemId)) return failure(quote, 'unique-item', '已经拥有这件唯一装备');
-  if (item.uniqueGroup && inventory.some((value, index) => value && !matched.components.includes(index) && ITEM.get(value.id)?.uniqueGroup === item.uniqueGroup)) return failure(quote, 'unique-group', '只能装备一双鞋，请升级已有鞋子');
+  if (item.uniqueGroup && inventory.some((value, index) => value && !matched.components.includes(index) && ITEM.get(value.id)?.uniqueGroup === item.uniqueGroup)) return failure(quote, 'unique-group', item.uniqueGroup === 'boots' ? '只能装备一双鞋，请升级已有鞋子' : `已拥有同类唯一装备，请通过已有散件升级`);
   if (item.stackLimit && count >= stackLimit) return failure(quote, 'stack-limit', `${item.name}最多携带 ${stackLimit} 个`);
   if (slot < 0) return failure(quote, 'inventory-full', '装备栏已满，请先出售装备');
   if (quote.missingGold > 0 || !Number.isFinite(hero?.gold)) return failure(quote, 'insufficient-gold', '金币不足');
@@ -83,7 +83,7 @@ export function buyEquipment(hero, itemId, options) {
 export function sellQuote(hero, index, { canShop = true } = {}) {
   const slot = Number.isInteger(index) && index >= 0 && index < INVENTORY_SIZE ? inventoryOf(hero)[index] : null;
   const item = ITEM.get(slot?.id), quote = { ok: true, code: 'available', reason: '', item: item || null,
-    itemId: item?.id || null, slot: index, refund: item ? Math.floor(item.cost * (item.sellRate ?? .7)) : 0,
+    itemId: item?.id || null, slot: index, refund: item ? Math.floor(item.cost * (item.sellRate ?? .7) + 1e-8) : 0,
     count: slot ? countOf(slot) : 0, remainingCount: slot ? countOf(slot) - 1 : 0 };
   if (!item) return failure(quote, 'empty-slot', '此装备栏为空');
   if (!canShop) return failure(quote, 'away-from-shop', '请在己方泉水商店内出售装备');

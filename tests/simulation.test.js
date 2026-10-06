@@ -14,6 +14,7 @@ function duel(hero) {
   const target = game.entities.find(e => e.kind === 'hero' && e.team === 'red');
   game.entities = [player, target];
   player.x = 0; player.z = 0;
+  target.heroId = 'garen'; target.ext = null; target.shield = 0;
   target.x = 10; target.z = 0;
   target.hp = target.maxHp = 10000;
   target.armor = target.magicResist = 0;

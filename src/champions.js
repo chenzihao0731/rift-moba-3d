@@ -1,3 +1,4 @@
+import { EXTENDED_CHAMPIONS } from './extended-champions.js';
 export const CHAMPIONS = [
   {id:'ahri',name:'阿狸',title:'九尾妖狐',role:'法师 · 灵活刺客',color:'#67deec',attackRange:20,hp:650,mana:440,attack:55,armor:24,speed:13,skills:[
     {key:'Q',name:'欺诈宝珠',description:'向前投出宝珠：去程造成魔法伤害，回程造成真实伤害。',cost:55,cooldown:7},
@@ -50,6 +51,7 @@ export const CHAMPIONS = [
     {key:'E',name:'嚼火者手雷',description:'投下三枚夹子，0.7 秒后武装，踩中的敌方英雄被禁锢并受到魔法伤害。夹子持续 5 秒。',cost:70,cooldown:18,range:30,targeting:'ground'},
     {key:'R',name:'超究极死神飞弹',description:'全地图火箭只碰撞敌方英雄，爆炸伤害随飞行距离和敌人已损失生命提升，并波及附近敌人。',cost:100,cooldown:80,range:270,targeting:'direction'},
   ]},
+...EXTENDED_CHAMPIONS,
 ];
 
 const ranges={ahri:[45,26,46,18],ashe:[24,52,240,240],garen:[6,0,9,17],lux:[53,43,49,88],ezreal:[53,53,17,240]};

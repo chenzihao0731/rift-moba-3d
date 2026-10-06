@@ -6,12 +6,12 @@ function tick(game,seconds){for(let i=0;i<Math.ceil(seconds/.05);i++)game.update
 function arena(hero){
   const game=new Game({hero,practice:true}),player=game.player,target=game.entities.find(e=>e.kind==='hero'&&e.team==='red');
   game.entities=[player,target];game._nextWave=100000;player.x=0;player.z=0;
-  target.x=12;target.z=0;target.hp=target.maxHp=10000;target.armor=target.magicResist=0;target.speed=0;target.stunUntil=10000;
+  target.heroId='garen';target.ext=null;target.shield=0;target.x=12;target.z=0;target.hp=target.maxHp=10000;target.armor=target.magicResist=0;target.speed=0;target.stunUntil=10000;
   return{game,player,target};
 }
 
-test('all eight champions publish complete aim metadata and new passives',()=>{
-  assert.equal(CHAMPIONS.length,8);
+test('all champions publish complete aim metadata and new passives',()=>{
+  assert.equal(CHAMPIONS.length,24);
   for(const id of ['yasuo','teemo','jinx']){
     const champion=CHAMPIONS.find(c=>c.id===id);assert.ok(champion.passive?.description);
     assert.deepEqual(champion.skills.map(s=>s.key),['Q','W','E','R']);
