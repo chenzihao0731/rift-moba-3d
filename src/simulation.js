@@ -1,3 +1,7 @@
+import { CHAMPIONS } from './champions.js';
+import { ITEMS } from './item-data.js';
+import { purchaseQuote, buyEquipment, sellQuote, sellEquipment } from './shop.js';
+export { CHAMPIONS, ITEMS };
 import { Navigation } from './navigation.js';
 // The match runs entirely in map coordinates; rendering is deliberately independent.
 const P = (x, z) => ({ x, z });
@@ -6,71 +10,17 @@ export const LANES = {
   mid: [P(-100,100),P(0,0),P(100,-100)],
   bot: [P(-100,100),P(-65,112),P(90,108),P(112,75),P(108,-65),P(100,-100)],
 };
-export const CHAMPIONS = [
-  {id:'ahri',name:'阿狸',title:'九尾妖狐',role:'法师 · 灵活刺客',color:'#67deec',attackRange:20,hp:650,mana:440,attack:55,armor:24,speed:13,skills:[
-    {key:'Q',name:'欺诈宝珠',description:'向前投出宝珠：去程造成魔法伤害，回程造成真实伤害。',cost:55,cooldown:7},
-    {key:'W',name:'妖异狐火',description:'召唤三团狐火自动追击附近敌人，并短暂提升移动速度。',cost:30,cooldown:9},
-    {key:'E',name:'魅惑妖术',description:'发射爱心，魅惑第一个命中的敌人，使其缓慢走向阿狸。',cost:50,cooldown:12},
-    {key:'R',name:'灵魄突袭',description:'向鼠标位置突进并发射灵魄弹，10 秒内可连续施放三次。',cost:100,cooldown:95},
-  ]},
-  {id:'ashe',name:'艾希',title:'寒冰射手',role:'射手 · 远程控制',color:'#8ecdf8',attackRange:24,hp:640,mana:320,attack:62,armor:26,speed:12.5,skills:[
-    {key:'Q',name:'射手的专注',description:'6 秒内显著提升攻速，普通攻击射出强化箭束。',cost:50,cooldown:10},
-    {key:'W',name:'万箭齐发',description:'射出扇形冰箭，造成物理伤害并减速敌人。',cost:60,cooldown:9},
-    {key:'E',name:'鹰击长空',description:'释放猎鹰，揭开目标附近的战争迷雾，持续 7 秒。',cost:0,cooldown:30},
-    {key:'R',name:'魔法水晶箭',description:'射出全地图冰箭，撞到敌方英雄时爆炸并长时间眩晕。',cost:100,cooldown:90},
-  ]},
-  {id:'garen',name:'盖伦',title:'德玛西亚之力',role:'战士 · 近战坦克',color:'#edc979',attackRange:5.8,hp:780,mana:0,attack:68,armor:36,speed:13.5,skills:[
-    {key:'Q',name:'致命打击',description:'解除减速并提升移动速度，下次攻击造成额外伤害和沉默。',cost:0,cooldown:8},
-    {key:'W',name:'勇气',description:'获得护盾，3 秒内受到的伤害减少 35%。',cost:0,cooldown:18},
-    {key:'E',name:'审判',description:'挥剑旋转 3 秒，连续伤害身边敌人；期间仍可移动。',cost:0,cooldown:9},
-    {key:'R',name:'德玛西亚正义',description:'以巨剑处决附近敌方英雄，造成随已损失生命提升的真实伤害。',cost:0,cooldown:90},
-  ]},
-  {id:'lux',name:'拉克丝',title:'光辉女郎',role:'法师 · 远程爆发',color:'#f4dfab',attackRange:20,hp:630,mana:480,attack:54,armor:22,speed:12.8,skills:[
-    {key:'Q',name:'光之束缚',description:'发射光球，禁锢路径上的前两个敌人并施加光芒标记。',cost:50,cooldown:10},
-    {key:'W',name:'曲光屏障',description:'抛出法杖，为路径上的自己与友军提供护盾。',cost:60,cooldown:12},
-    {key:'E',name:'透光奇点',description:'在目标处放置减速光球，再按 E 引爆；5 秒后自动爆炸。',cost:60,cooldown:10},
-    {key:'R',name:'终极闪光',description:'发射穿透性的巨大光束，伤害并引爆所有光芒标记。',cost:100,cooldown:60},
-  ]},
-  {id:'ezreal',name:'伊泽瑞尔',title:'探险家',role:'射手 · 技能游击',color:'#e6bc71',attackRange:21,hp:660,mana:400,attack:61,armor:25,speed:13,skills:[
-    {key:'Q',name:'秘术射击',description:'射出能量弹，命中造成物理伤害并缩短其他技能冷却。',cost:28,cooldown:5.5},
-    {key:'W',name:'精华跃动',description:'以能量环标记首个英雄或建筑；后续攻击或技能引爆标记。',cost:50,cooldown:10},
-    {key:'E',name:'奥术跃迁',description:'闪烁至目标附近，并向最近敌人发射一枚自动追踪弹。',cost:70,cooldown:18},
-    {key:'R',name:'精准弹幕',description:'射出贯穿全地图的能量弧，对沿途所有敌人造成魔法伤害。',cost:100,cooldown:90},
-  ]},
-];
-export const ITEMS = [
-  {id:'doran-blade',name:'多兰之刃',cost:450,description:'+10 攻击力 · +80 生命 · 3% 生命偷取',icon:'blade',stats:{attack:10,hp:80,lifesteal:.03}},
-  {id:'doran-ring',name:'多兰之戒',cost:400,description:'+18 法术强度 · +70 生命 · 法力回复',icon:'ring',stats:{ap:18,hp:70,manaRegen:2}},
-  {id:'boots',name:'速度之靴',cost:300,description:'+2 移动速度',icon:'boots',stats:{speed:2}},
-  {id:'berserkers',name:'狂战士胫甲',cost:1100,description:'+4 移动速度 · +35% 攻击速度',icon:'boots',stats:{speed:4,attackSpeed:.35}},
-  {id:'infinity',name:'无尽之刃',cost:3600,description:'+70 攻击力 · +25% 暴击率 · 强化暴击',icon:'blade',stats:{attack:70,crit:.25,critPower:.35}},
-  {id:'rabadon',name:'灭世者的死亡之帽',cost:3600,description:'+100 法术强度 · 总法术强度提升 30%',icon:'hat',stats:{ap:100,apMultiplier:.3}},
-  {id:'ludens',name:'卢登的回声',cost:2850,description:'+75 法术强度 · +300 法力 · +15 技能急速',icon:'orb',stats:{ap:75,mana:300,haste:15}},
-  {id:'blade-ruined',name:'破败王者之刃',cost:3200,description:'+40 攻击力 · +25% 攻速 · +10% 吸血，攻击附带百分比伤害',icon:'blade',stats:{attack:40,attackSpeed:.25,lifesteal:.1}},
-  {id:'sunfire',name:'日炎圣盾',cost:2700,description:'+450 生命 · +45 护甲，灼烧身边敌人',icon:'shield',stats:{hp:450,armor:45}},
-  {id:'zhonya',name:'中娅沙漏',cost:3250,description:'+80 法术强度 · +40 护甲，主动：凝滞 2.5 秒',icon:'hourglass',stats:{ap:80,armor:40},active:'stasis'},
-  {id:'potion',name:'生命药水',cost:50,description:'主动使用：6 秒内恢复 150 点生命，可叠加购买',icon:'potion',stats:{},active:'heal'},
-  {id:'control-ward',name:'控制守卫',cost:75,description:'主动使用：在附近放置持续 150 秒的真视守卫',icon:'ward',stats:{},active:'ward'},
-];
 
 const CHAMP = Object.fromEntries(CHAMPIONS.map(c=>[c.id,c]));
 const ITEM = Object.fromEntries(ITEMS.map(i=>[i.id,i]));
-const SKILL_RANGES = {
-  ahri:[45,26,46,18],ashe:[24,52,240,240],garen:[6,0,9,17],lux:[53,43,49,88],ezreal:[53,53,17,240],
-};
-for(const champion of CHAMPIONS)champion.skills.forEach((skill,index)=>{
-  skill.range=SKILL_RANGES[champion.id][index];
-  skill.targeting=champion.id==='garen'&&skill.key==='R'?'target':
-    (champion.id==='garen'||skill.key==='W'&&champion.id==='ahri'||skill.key==='Q'&&champion.id==='ashe')?'self':
-    (champion.id==='lux'&&skill.key==='E'||champion.id==='ashe'&&skill.key==='E')?'ground':'direction';
-});
 const BASE = {blue:P(-100,100),red:P(100,-100)};
 const ENEMY = {blue:'red',red:'blue'};
 const clamp = (v,a,b)=>Math.max(a,Math.min(b,v));
 const distance = (a,b)=>Math.hypot(a.x-b.x,a.z-b.z);
 const isStructure = e=>e.kind==='tower'||e.kind==='inhibitor'||e.kind==='nexus';
 const lineDistance = (p,a,b)=>{const dx=b.x-a.x,dz=b.z-a.z,d=dx*dx+dz*dz; const t=clamp(((p.x-a.x)*dx+(p.z-a.z)*dz)/(d||1),0,1); return Math.hypot(p.x-a.x-t*dx,p.z-a.z-t*dz);};
-const BUFFS = ['slowUntil','stunUntil','rootUntil','silenceUntil','shieldUntil','invulnerableUntil','hasteUntil','qUntil','spinUntil','fortifyUntil','igniteUntil','markedUntil'];
+const segmentsCross=(a,b,c,d)=>{const cross=(u,v,w)=>(v.x-u.x)*(w.z-u.z)-(v.z-u.z)*(w.x-u.x),ab1=cross(a,b,c),ab2=cross(a,b,d),cd1=cross(c,d,a),cd2=cross(c,d,b);return ab1*ab2<=0&&cd1*cd2<=0&&Math.max(a.x,b.x)>=Math.min(c.x,d.x)&&Math.max(c.x,d.x)>=Math.min(a.x,b.x)&&Math.max(a.z,b.z)>=Math.min(c.z,d.z)&&Math.max(c.z,d.z)>=Math.min(a.z,b.z);};
+const BUFFS = ['slowUntil','stunUntil','rootUntil','silenceUntil','shieldUntil','invulnerableUntil','hasteUntil','qUntil','spinUntil','fortifyUntil','igniteUntil','markedUntil','airborneUntil','blindUntil','poisonUntil','excitedUntil'];
 const BUSHES = [P(-72,-12),P(-12,-72),P(72,12),P(12,72),P(-112,-63),P(-71,-109),P(110,59),P(66,110),P(-20,-20),P(20,20)];
 export const BUSH_AREAS = BUSHES;
 function pathLength(points){let total=0;for(let i=1;i<points.length;i++)total+=distance(points[i-1],points[i]);return total;}
@@ -82,9 +32,9 @@ export class Game {
   restart(heroId=this.player?.heroId||'ahri'){
     this.time=0;this.winner=null;this.entities=[];this.projectiles=[];this.zones=[];this.reveals=[];this.events=[];this.score={blue:0,red:0};this._id=0;this._wave=0;this._nextWave=5;this._tick=.5;
     this.player=this._hero(CHAMP[heroId]?heroId:'ahri','blue','mid',true);
-    const allies=[['garen','top'],['ashe','bot'],['ezreal','bot'],['lux','jungle']];
+    const allies=[['yasuo','top'],['jinx','bot'],['ezreal','bot'],['teemo','jungle']];
     for(const [id,lane] of allies)this._hero(id,'blue',lane);
-    for(const [id,lane] of [['garen','top'],['ahri','mid'],['ashe','bot'],['ezreal','bot'],['lux','jungle']])this._hero(id,'red',lane);
+    for(const [id,lane] of [['garen','top'],['yasuo','mid'],['jinx','bot'],['ashe','bot'],['teemo','jungle']])this._hero(id,'red',lane);
     for(const team of ['blue','red']){
       for(const lane of ['top','mid','bot']){
         for(const tier of [1,2,3]){const t=team==='blue'?({1:.34,2:.22,3:.1}[tier]):1-({1:.34,2:.22,3:.1}[tier]);const p=pathPoint(lane,t);this._entity({kind:'tower',team,...p,hp:1450+tier*260,maxHp:1450+tier*260,attack:95,armor:40,magicResist:40,attackRange:25,radius:3.1,lane,tier,attackCooldown:0,name:`${team==='blue'?'蓝':'红'}方${{top:'上路',mid:'中路',bot:'下路'}[lane]}${{1:'外塔',2:'二塔',3:'高地塔'}[tier]}`});}
@@ -112,7 +62,7 @@ export class Game {
   _hero(heroId,team,lane,player=false){
     const c=CHAMP[heroId],base=BASE[team],sign=team==='blue'?1:-1,index=this.entities.filter(e=>e.kind==='hero'&&e.team===team).length;
     const offsets=[[-8,8],[-13,3],[-3,13],[-13,10],[-10,13]][index%5],spawnX=base.x+offsets[0]*sign,spawnZ=base.z+offsets[1]*sign;
-    const h=this._entity({kind:'hero',heroId,team,name:c.name,x:spawnX,z:spawnZ,hp:c.hp,maxHp:c.hp,mana:c.mana,maxMana:c.mana,baseHp:c.hp,baseMana:c.mana,baseAttack:c.attack,baseArmor:c.armor,baseMagicResist:30,baseSpeed:c.speed,attack:c.attack,armor:c.armor,magicResist:30,attackRange:c.attackRange,speed:c.speed,ap:0,haste:0,attackSpeed:.75,crit:0,critPower:0,lifesteal:0,manaRegen:0,level:1,xp:0,xpToNext:120,gold:player?500:450,kills:0,deaths:0,assists:0,cs:0,inventory:[],cooldowns:{Q:0,W:0,E:0,R:0,D:0,F:0,4:0},skillRanks:{Q:1,W:0,E:0,R:0},skillPoints:0,lane,isPlayer:player,radius:1.8,wardCharges:2,wardTimer:0,contributors:{},command:player?{type:'stop'}:{type:'ai'},aiThink:0,aiAggression:.6+Math.random()*.3,spawnX,spawnZ});
+    const h=this._entity({kind:'hero',heroId,team,name:c.name,x:spawnX,z:spawnZ,hp:c.hp,maxHp:c.hp,mana:c.mana,maxMana:c.mana,baseHp:c.hp,baseMana:c.mana,baseAttack:c.attack,baseArmor:c.armor,baseMagicResist:30,baseSpeed:c.speed,attack:c.attack,armor:c.armor,magicResist:30,attackRange:c.attackRange,speed:c.speed,ap:0,haste:0,attackSpeed:.75,crit:0,critPower:0,lifesteal:0,manaRegen:0,level:1,xp:0,xpToNext:120,gold:player?500:450,kills:0,deaths:0,assists:0,cs:0,inventory:Array(6).fill(null),cooldowns:{Q:0,W:0,E:0,R:0,D:0,F:0,4:0},skillRanks:{Q:1,W:0,E:0,R:0},skillPoints:0,lane,isPlayer:player,radius:1.8,wardCharges:2,wardTimer:0,contributors:{},command:player?{type:'stop'}:{type:'ai'},aiThink:0,aiAggression:.6+Math.random()*.3,spawnX,spawnZ,flow:0,qStacks:0,dashLocks:{},shroomCharges:0,shroomRecharge:0,rocketMode:false,minigunStacks:0});
     h.skillLevels=h.skillRanks;return h;
   }
   _monster(type,x,z,hp,attack,respawnTime,reward,name){const available=type==='baron'?180:type==='dragon'?35:0;return this._entity({kind:'monster',monsterType:type,team:'neutral',x,z,homeX:x,homeZ:z,hp,maxHp:hp,attack,armor:type==='baron'?50:15,magicResist:15,attackRange:6,speed:6,radius:type==='baron'?5:type==='dragon'?4:2.6,respawnTime,reward,name,alive:available===0||this.practice,respawnAt:available,attackCooldown:0});}
@@ -132,26 +82,32 @@ export class Game {
   recall(){const h=this.player;if(!h.alive||this.winner)return false;h.command={type:'stop'};h.recallAt=this.time+(this.practice?2:6);this._event('recall',{x:h.x,z:h.z,team:h.team,source:h.id,text:'正在回城'});return true;}
   _cancelRecall(h){h.recallAt=0;}
   _nearBase(h){return distance(h,BASE[h.team])<20;}
-  buy(itemId){const h=this.player,item=ITEM[itemId];if(!item)return this._fail(h,'未知装备');if(!h.alive&&!this.practice)return this._fail(h,'英雄阵亡时无法购买装备');if(!this._nearBase(h)&&!this.practice){this._event('message',{text:'请在己方泉水商店内购买装备'});return false;}if(h.gold<item.cost){this._event('message',{text:'金币不足'});return false;}let slot=h.inventory.find(s=>s.id===itemId&&['potion','control-ward'].includes(itemId));if(!slot&&h.inventory.length>=6){this._event('message',{text:'装备栏已满'});return false;}h.gold-=item.cost;if(slot)slot.count=(slot.count||1)+1;else h.inventory.push({id:itemId,count:1,cooldown:0});this._recomputeStats(h);this._event('purchase',{source:h.id,text:`已购买 ${item.name}`,amount:item.cost});return true;}
+  canShop(h=this.player){return this.practice||!h.alive||this._nearBase(h);}
+  quoteBuy(itemId){return purchaseQuote(this.player,itemId,{canShop:this.canShop()});}
+  quoteSell(index){return sellQuote(this.player,index,{canShop:this.canShop()});}
+  buy(itemId){const h=this.player,quote=buyEquipment(h,itemId,{canShop:this.canShop()});if(!quote.ok)return this._fail(h,quote.reason);this._recomputeStats(h);this._event('purchase',{source:h.id,text:`已购买 ${quote.item.name}`,amount:quote.cost});return true;}
+  sell(index){const h=this.player,quote=sellEquipment(h,index,{canShop:this.canShop()});if(!quote.ok)return this._fail(h,quote.reason);this._recomputeStats(h);this._event('sale',{source:h.id,text:`已出售 ${quote.item.name} · 返还 ${quote.refund} 金币`,amount:quote.refund});return true;}
   _fail(h,text){if(h.isPlayer&&(!this._lastFail||this.time-this._lastFail.at>.5||this._lastFail.text!==text)){this._event('message',{text});this._lastFail={text,at:this.time};}return false;}
   levelSkill(key){return this._learn(this.player,String(key).toUpperCase());}
-  _learn(h,key){if(!['Q','W','E','R'].includes(key))return false;if(h.skillPoints<=0)return this._fail(h,'没有可用的技能点');const rank=h.skillLevels[key]||0,max=key==='R'?3:5;if(rank>=max)return this._fail(h,'技能已经升到最高等级');const required=key==='R'?[6,11,16][rank]:rank*2+1;if(h.level<required)return this._fail(h,`此技能升级需要英雄达到 ${required} 级`);h.skillLevels[key]=rank+1;h.skillPoints--;if(h.isPlayer)this._event('message',{text:`${CHAMP[h.heroId].skills.find(s=>s.key===key).name} 升至 ${rank+1} 级`});return true;}
+  _learn(h,key){if(!['Q','W','E','R'].includes(key))return false;if(h.skillPoints<=0)return this._fail(h,'没有可用的技能点');const rank=h.skillLevels[key]||0,max=key==='R'?3:5;if(rank>=max)return this._fail(h,'技能已经升到最高等级');const required=key==='R'?[6,11,16][rank]:rank*2+1;if(h.level<required)return this._fail(h,`此技能升级需要英雄达到 ${required} 级`);h.skillLevels[key]=rank+1;h.skillPoints--;if(h.heroId==='teemo'&&key==='R'&&!rank)h.shroomCharges=3;if(h.isPlayer)this._event('message',{text:`${CHAMP[h.heroId].skills.find(s=>s.key===key).name} 升至 ${rank+1} 级`});return true;}
   useItem(index,x=this.player.x,z=this.player.z){const h=this.player,slot=h.inventory[index],item=ITEM[slot?.id];if(!h.alive||!item?.active||slot.cooldown>0)return false;if(item.active==='stasis'){h.invulnerableUntil=this.time+2.5;h.stunUntil=this.time+2.5;slot.cooldown=90;this._event('spell',{x:h.x,z:h.z,source:h.id,hero:h.heroId,key:'ZHONYA',radius:3,color:'#ffd363'});}
     if(item.active==='heal'){h.potionUntil=this.time+6;this._consume(h,index);this._event('message',{text:'生命药水：持续恢复生命'});}
     if(item.active==='ward'){if(distance(h,{x,z})>25){this._event('message',{text:'守卫放置距离过远'});return false;}this._addWard(h,x,z,true);this._consume(h,index);}return true;}
-  _consume(h,index){const s=h.inventory[index];if(s.count>1)s.count--;else h.inventory.splice(index,1);}
-  _recomputeStats(h){const oldMaxHp=h.maxHp,oldMaxMana=h.maxMana;let stats={hp:0,mana:0,attack:0,armor:0,ap:0,speed:0,haste:0,attackSpeed:0,lifesteal:0,crit:0,critPower:0,manaRegen:0,apMultiplier:0};for(const slot of h.inventory)for(const[k,v]of Object.entries(ITEM[slot.id]?.stats||{}))stats[k]=(stats[k]||0)+v;h.maxHp=h.baseHp+(h.level-1)*85+stats.hp;h.maxMana=h.baseMana? h.baseMana+(h.level-1)*35+stats.mana:0;h.attack=h.baseAttack+(h.level-1)*4+stats.attack+(h.dragonStacks||0)*6;h.armor=h.baseArmor+(h.level-1)*3.5+stats.armor;h.magicResist=h.baseMagicResist+(h.level-1)*1.5;h.ap=(stats.ap+(h.dragonStacks||0)*10)*(1+stats.apMultiplier);h.speed=h.baseSpeed+Math.min(stats.speed,5);h.attackSpeed=.75*(1+(h.level-1)*.025+stats.attackSpeed);for(const key of ['haste','lifesteal','crit','critPower','manaRegen'])h[key]=stats[key];h.hp=Math.min(h.maxHp,h.hp+Math.max(0,h.maxHp-oldMaxHp));h.mana=Math.min(h.maxMana,h.mana+Math.max(0,h.maxMana-oldMaxMana));}
+  _consume(h,index){const s=h.inventory[index];if(s.count>1)s.count--;else h.inventory[index]=null;}
+  _recomputeStats(h){let stats={hp:0,mana:0,attack:0,armor:0,ap:0,speed:0,haste:0,attackSpeed:0,lifesteal:0,crit:0,critPower:0,manaRegen:0,apMultiplier:0};for(const slot of h.inventory)for(const[k,v]of Object.entries(ITEM[slot?.id]?.stats||{}))stats[k]=(stats[k]||0)+v;h.maxHp=h.baseHp+(h.level-1)*85+stats.hp;h.maxMana=h.baseMana? h.baseMana+(h.level-1)*35+stats.mana:0;h.attack=h.baseAttack+(h.level-1)*4+stats.attack+(h.dragonStacks||0)*6;h.armor=h.baseArmor+(h.level-1)*3.5+stats.armor;h.magicResist=h.baseMagicResist+(h.level-1)*1.5;h.ap=(stats.ap+(h.dragonStacks||0)*10)*(1+stats.apMultiplier);h.speed=h.baseSpeed+Math.min(stats.speed,5);h.attackSpeed=.75*(1+(h.level-1)*.025+stats.attackSpeed);for(const key of ['haste','lifesteal','crit','critPower','manaRegen'])h[key]=stats[key];h.hp=Math.min(h.maxHp,h.hp);h.mana=Math.min(h.maxMana,h.mana);if(h.heroId==='yasuo')h.crit=Math.min(1,h.crit*2);h.attackRange=CHAMP[h.heroId].attackRange+(h.heroId==='jinx'&&h.rocketMode?6+(h.skillLevels.Q||1):0);}
   placeWard(x,z){const h=this.player;if(!h.alive||h.cooldowns[4]>0)return false;if(h.wardCharges<=0){this._event('message',{text:'侦查守卫正在充能'});return false;}if(distance(h,{x,z})>25){const d=distance(h,{x,z});x=h.x+(x-h.x)*25/d;z=h.z+(z-h.z)*25/d;}h.wardCharges--;h.cooldowns[4]=.8;this._addWard(h,x,z,false);return true;}
   _addWard(h,x,z,control){const wards=this.entities.filter(e=>e.kind==='ward'&&e.sourceId===h.id&&e.alive&&!e.control);if(wards.length>=3)wards[0].alive=false;const e=this._entity({kind:'ward',team:h.team,x:clamp(x,-119,119),z:clamp(z,-119,119),hp:3,maxHp:3,radius:1,sourceId:h.id,control,expiresAt:this.time+(control?150:90),visionRange:control?26:23,name:control?'控制守卫':'侦查守卫'});this._event('ward',{x:e.x,z:e.z,source:h.id,team:h.team,text:control?'控制守卫已部署':'侦查守卫已部署',radius:e.visionRange});}
   isVisible(e,team='blue'){
     if(!e?.alive)return e?.kind==='hero'&&e.team===team;
     if(e.team===team||isStructure(e)||this.practice)return true;
+    if(e.kind==='hero'&&e.stealthed&&!this.entities.some(v=>v.alive&&v.team===team&&v.kind==='ward'&&v.control&&distance(v,e)<v.visionRange))return false;
     if(e.kind==='ward'&&!e.control)return this.entities.some(v=>v.alive&&v.team===team&&v.kind==='ward'&&v.control&&distance(v,e)<v.visionRange);
-    if(this.reveals.some(r=>r.team===team&&r.until>this.time&&distance(r,e)<r.radius))return true;
+    if(e.revealedUntil>this.time||this.reveals.some(r=>r.team===team&&r.until>this.time&&distance(r,e)<r.radius))return true;
     const bush=BUSHES.find(b=>distance(b,e)<8);
     return this.entities.some(v=>v.alive&&v.team===team&&(v.kind==='hero'||v.kind==='minion'||v.kind==='tower'||v.kind==='ward')&&distance(v,e)<(v.visionRange||(v.kind==='hero'?31:v.kind==='tower'?31:20))&&(!bush||v.kind==='ward'||distance(v,bush)<10||e.lastDamagedAt>this.time-1.5));
   }
   unitsTeamVisible(e,team='blue'){return this.isVisible(e,team);}
+  isZoneVisible(zone,team='blue'){if(zone.dead)return false;if(zone.team===team||this.practice||zone.revealedUntil>this.time)return true;if(zone.type!=='teemo-mushroom')return this.isVisible({alive:true,kind:'zone',team:zone.team,x:zone.x,z:zone.z},team);return this.entities.some(e=>e.alive&&e.kind==='ward'&&e.team===team&&e.control&&distance(e,zone)<e.visionRange);}
   _canAttackTarget(h,t,allowNeutral=true,allowWard=true){return !!(t?.alive&&t.id!==h.id&&t.team!==h.team&&(allowNeutral||t.team!=='neutral')&&(allowWard||t.kind!=='ward')&&this.isVisible(t,h.team)&&!(t.invulnerableUntil>this.time)&&(!isStructure(t)||this._canHitStructure(t,h)));}
   _attackMoveTarget(h,cursor){
     let target=null,best=Infinity;
@@ -164,9 +120,16 @@ export class Game {
   }
   _enemies(h,range,filter=()=>true){return this.entities.filter(e=>e.alive&&e.team!==h.team&&e.team!=='neutral'&&e.kind!=='ward'&&distance(e,h)<range+e.radius&&filter(e));}
   _nearest(h,range,filter=()=>true,allowNeutral=false){let best=null,score=Infinity;for(const e of this.entities){if(!e.alive||e.id===h.id||e.team===h.team||(!allowNeutral&&e.team==='neutral')||e.kind==='ward'||!filter(e))continue;if(e.team!=='neutral'&&!this.isVisible(e,h.team))continue;const d=distance(h,e);if(d<range+e.radius){let s=d+(isStructure(e)?8:0)+(e.kind==='hero'?-3:0);if(s<score){score=s;best=e;}}}return best;}
+  _combatEnemies(h,range,filter=()=>true){return this.entities.filter(e=>e.alive&&e.team!==h.team&&e.kind!=='ward'&&!isStructure(e)&&distance(h,e)<range+e.radius&&filter(e));}
+  _zone(type,h,data){const kind={'yasuo-wall':'windwall','teemo-mushroom':'mushroom','jinx-chompers':'chompers',lux:'light'}[type];const zone={id:++this._id,type,kind,hero:h.heroId,team:h.team,sourceId:h.id,...data};this.zones.push(zone);return zone;}
+  _airborne(t,duration){t.airborneUntil=this.time+duration;t.stunUntil=Math.max(t.stunUntil||0,t.airborneUntil);}
+  _poison(t,h,dps,duration,key='POISON'){const prior=t.poisons?.[h.id];t.poisons??={};t.poisons[h.id]={until:this.time+duration,dps:Math.max(prior?.dps||0,dps),nextTick:prior?.nextTick||this.time+.5,key};t.poisonUntil=Math.max(t.poisonUntil||0,this.time+duration);}
+  _statusUpdate(e){for(const[id,poison]of Object.entries(e.poisons||{})){if(poison.until<this.time){delete e.poisons[id];continue;}if(poison.nextTick<=this.time){poison.nextTick+=.5;this._damage(e,poison.dps*.5,'magic',this.getEntity(Number(id)),poison.key);if(!e.alive)return;}}}
+  _breakStealth(h){if(h.heroId==='teemo'){if(h.stealthed)h.ambushUntil=this.time+3;h.stealthed=false;h.stealthStill=0;}h.lastActionAt=this.time;}
+  _excite(h){if(h?.heroId!=='jinx'||!h.alive)return;h.excitedUntil=this.time+6;this._event('spell',{hero:'jinx',key:'EXCITED',source:h.id,team:h.team,x:h.x,z:h.z,radius:5,color:'#f4a2d4'});}
   cast(key,x=this.player.x,z=this.player.z,targetId){return this._cast(this.player,String(key).toUpperCase(),x,z,targetId);}
   _cast(h,key,x,z,targetId){
-    if(!h.alive)return this._fail(h,'英雄阵亡，等待复活');if(this.winner)return false;if(h.stunUntil>this.time||h.invulnerableUntil>this.time)return this._fail(h,'受到控制，暂时无法施放技能');
+    if(!h.alive)return this._fail(h,'英雄阵亡，等待复活');if(this.winner)return false;if(h.stunUntil>this.time||h.airborneUntil>this.time||h.invulnerableUntil>this.time)return this._fail(h,'受到控制，暂时无法施放技能');
     if(key==='4')return h.isPlayer?this.placeWard(x,z):false;
     if(key==='E'&&h.heroId==='lux'&&h.lightZone){this._detonate(h.lightZone);h.lightZone=null;return true;}
     const isRecast=key==='R'&&h.heroId==='ahri'&&h.dashCharges>0&&h.dashUntil>this.time;
@@ -179,10 +142,15 @@ export class Game {
     const skill=CHAMP[h.heroId].skills.find(s=>s.key===key);if(!skill)return false;
     if(key==='R'&&h.level<6){if(h.isPlayer)this._event('message',{text:'终极技能在英雄达到 6 级后解锁'});return false;}
     if(!h.skillLevels[key])return this._fail(h,`${key} 尚未学习，请点击技能上的 + 号`);
+    if(h.heroId==='teemo'&&key==='E')return this._fail(h,'毒性射击是被动技能：普通攻击自动施毒');
+    if(h.heroId==='teemo'&&key==='R'&&h.shroomCharges<=0)return this._fail(h,'蘑菇充能不足，等待补充');
     const cost=isRecast?0:skill.cost;if(h.mana<cost&&!this.practice){if(h.isPlayer)this._event('message',{text:'法力不足'});return false;}
     let target=this.getEntity(targetId);if(!target?.alive||target.team===h.team)target=null;
+    if(h.heroId==='teemo'&&key==='Q'){target=target||this._nearest({x,z,team:h.team},10,e=>!isStructure(e),true);if(!target||isStructure(target)||distance(h,target)>30+target.radius||!this.isVisible(target,h.team))return this._fail(h,'致盲吹箭需要射程内的可见敌人');}
+    if(h.heroId==='yasuo'&&key==='E'){target=target||this._nearest({x,z,team:h.team},10,e=>!isStructure(e),true);if(!target||isStructure(target)||distance(h,target)>18+target.radius||!this.isVisible(target,h.team))return this._fail(h,'踏前斩需要附近的可见敌人');if((h.dashLocks[target.id]||0)>this.time)return this._fail(h,'这个目标暂时不能再次穿越');}
+    if(h.heroId==='yasuo'&&key==='R'){if(target&&!this.isVisible(target,h.team))return this._fail(h,'狂风绝息斩需要可见的击飞目标');if(!target||target.kind!=='hero'||!(target.airborneUntil>this.time))target=this._nearest(h,62,e=>e.kind==='hero'&&e.airborneUntil>this.time);if(!target||distance(h,target)>62||!(target.airborneUntil>this.time)||!this.isVisible(target,h.team))return this._fail(h,'狂风绝息斩需要被击飞的敌方英雄');}
     if(h.heroId==='garen'&&key==='R'){target=target||this._nearest({x,z,team:h.team},15,e=>e.kind==='hero');if(!target||target.kind!=='hero'||distance(h,target)>17){if(h.isPlayer)this._event('message',{text:'德玛西亚正义需要附近的敌方英雄'});return false;}}
-    this._cancelRecall(h);h.mana=Math.max(0,h.mana-cost);if(!isRecast)h.cooldowns[key]=skill.cooldown/(1+h.haste/100);h.lastCastAt=this.time;
+    this._cancelRecall(h);this._breakStealth(h);h.mana=Math.max(0,h.mana-cost);if(!isRecast)h.cooldowns[key]=skill.cooldown/(1+h.haste/100);h.lastCastAt=this.time;if(h.heroId==='yasuo'&&key==='Q')h.cooldowns.Q=Math.max(1.1,skill.cooldown/(1+(h.attackSpeed/.75-1)*1.1));
     const d=Math.hypot(x-h.x,z-h.z)||1,dir=P((x-h.x)/d,(z-h.z)/d),ap=h.ap+(h.baronUntil>this.time?35:0),rank=h.skillLevels[key]||1;
     const spell={source:h.id,hero:h.heroId,key,team:h.team,x,z,fromX:h.x,fromZ:h.z,toX:x,toZ:z,color:CHAMP[h.heroId].color};
     if(h.heroId==='ahri'){
@@ -210,6 +178,23 @@ export class Game {
       if(key==='W')this._projectile(h,dir,{skill:'W',range:53,speed:42,radius:2,damage:0,damageType:'magic',effect:'essence',heroesOnly:true,hitStructures:true});
       if(key==='E'){this._dash(h,x,z,17);const t=this._nearest(h,28,e=>e.kind==='hero'||e.kind==='minion'||e.kind==='monster',true);if(t)this._tracking(h,t,55+rank*25+ap*.65,'magic','E');spell.toX=h.x;spell.toZ=h.z;spell.radius=4;}
       if(key==='R')this._projectile(h,dir,{skill:'R',range:240,speed:50,radius:5,damage:220+rank*100+h.attack*.7+ap*.9,damageType:'magic',pierce:true,falloff:.93});
+    }else if(h.heroId==='yasuo'){
+      if(key==='Q'){
+        const damage=25+rank*18+h.attack*1.05;if(h.qStacks>=2&&h.qStackUntil>this.time){h.qStacks=0;this._projectile(h,dir,{skill:'Q3',range:47,speed:32,radius:3,damage,damageType:'physical',pierce:true,effect:'tornado'});spell.key='Q3';spell.toX=h.x+dir.x*47;spell.toZ=h.z+dir.z*47;}
+        else{if(h.qStackUntil<this.time)h.qStacks=0;const spinning=h.dashComboUntil>this.time,end=P(h.x+dir.x*18,h.z+dir.z*18);let hit=false;for(const t of this._combatEnemies(h,spinning?10:22))if(spinning?distance(h,t)<10+t.radius:lineDistance(t,h,end)<2+t.radius){this._damage(t,damage,'physical',h,'Q');hit=true;}if(hit){h.qStacks=Math.min(2,h.qStacks+1);h.qStackUntil=this.time+7;}spell.toX=spinning?h.x:end.x;spell.toZ=spinning?h.z:end.z;spell.radius=spinning?10:2;}
+      }
+      if(key==='W'){const center=P(h.x+dir.x*8,h.z+dir.z*8),half=9+rank;this._zone('yasuo-wall',h,{...center,fromX:center.x-dir.z*half,fromZ:center.z+dir.x*half,toX:center.x+dir.z*half,toZ:center.z-dir.x*half,radius:1.5,until:this.time+4});spell.x=center.x;spell.z=center.z;spell.toX=center.x-dir.z*half;spell.toZ=center.z+dir.x*half;spell.radius=half;}
+      if(key==='E'){const length=distance(h,target)||1,dx=(target.x-h.x)/length,dz=(target.z-h.z)/length;this._dash(h,target.x+dx*5,target.z+dz*5,23);h.dashLocks[target.id]=this.time+8;h.dashComboUntil=this.time+.65;this._damage(target,35+rank*20+ap*.6,'magic',h,'E');spell.target=target.id;spell.toX=h.x;spell.toZ=h.z;spell.x=h.x;spell.z=h.z;}
+      if(key==='R'){const victims=this._combatEnemies({x:target.x,z:target.z,team:h.team},13,t=>t.kind==='hero'&&t.airborneUntil>this.time);if(!victims.includes(target))victims.push(target);this._dash(h,target.x-2*dir.x,target.z-2*dir.z,62);for(const t of victims){this._airborne(t,1.1);this._damage(t,130+rank*80+h.attack*1.2,'physical',h,'R');}h.flow=100;h.armorPenUntil=this.time+10;spell.target=target.id;spell.x=target.x;spell.z=target.z;spell.toX=h.x;spell.toZ=h.z;spell.radius=13;}
+    }else if(h.heroId==='teemo'){
+      if(key==='Q')this._tracking(h,target,40+rank*35+ap*.8,'magic','Q').effect='blind';
+      if(key==='W'){h.teemoRunUntil=this.time+3;spell.x=h.x;spell.z=h.z;spell.radius=4;}
+      if(key==='R'){const point=P(h.x+dir.x*Math.min(d,25),h.z+dir.z*Math.min(d,25)),spot=this.navigation?this.navigation.nearestPoint(point):point;const existing=this.zones.filter(zone=>zone.type==='teemo-mushroom'&&zone.sourceId===h.id&&!zone.dead);if(existing.length>=8)existing[0].dead=true;h.shroomCharges--;this._zone('teemo-mushroom',h,{...spot,radius:4.5,damage:40+rank*25+ap*.25,poisonDps:30+rank*20+ap*.15,armedAt:this.time+.8,until:this.time+180});spell.x=spot.x;spell.z=spot.z;spell.toX=spot.x;spell.toZ=spot.z;spell.radius=4.5;}
+    }else if(h.heroId==='jinx'){
+      if(key==='Q'){h.rocketMode=!h.rocketMode;h.attackRange=CHAMP.jinx.attackRange+(h.rocketMode?6+rank:0);h.minigunStacks=0;spell.x=h.x;spell.z=h.z;spell.toX=h.x;spell.toZ=h.z;spell.radius=h.rocketMode?5:3;spell.rocket=h.rocketMode;}
+      if(key==='W')this._projectile(h,dir,{skill:'W',range:62,speed:51,radius:1.5,damage:25+rank*25+h.attack*1.45,damageType:'physical',effect:'zap'});
+      if(key==='E'){const spot=P(h.x+dir.x*Math.min(d,30),h.z+dir.z*Math.min(d,30));for(let i=-1;i<=1;i++){const point=P(spot.x-dir.z*i*5,spot.z+dir.x*i*5),safe=this.navigation?this.navigation.nearestPoint(point):point;this._zone('jinx-chompers',h,{...safe,radius:2.7,damage:45+rank*25+ap,armedAt:this.time+.7,until:this.time+5});}spell.x=spot.x;spell.z=spot.z;spell.toX=spot.x;spell.toZ=spot.z;spell.radius=8;}
+      if(key==='R')this._projectile(h,dir,{skill:'R',range:270,speed:42,radius:3,damage:110+rank*90+h.attack*1.1,missingRatio:.15+rank*.05,damageType:'physical',heroesOnly:true,effect:'jinxRocket'});
     }
     this._event('spell',spell);return true;
   }
@@ -219,10 +204,14 @@ export class Game {
   _tracking(h,t,damage,type,skill='attack'){return this._projectile(h,P(0,0),{targetId:t.id,skill,range:150,speed:55,radius:.6,damage,damageType:type});}
   _triggerMark(h,t){if(t.markedBy===h.id&&t.markedUntil>this.time){t.markedUntil=0;const amount=h.heroId==='ezreal'?80+h.level*10+h.ap*.65:20+h.level*10+h.ap*.25;this._damage(t,amount,'magic',h,'mark',true);}}
   _projectiles(dt){
-    for(const p of this.projectiles){if(p.dead)continue;p.age+=dt;const source=this.getEntity(p.sourceId);if(!source){p.dead=true;continue;}const old=P(p.x,p.z);
-      if(p.targetId){const t=this.getEntity(p.targetId);if(!t?.alive){p.dead=true;continue;}const d=distance(p,t);p.dx=(t.x-p.x)/(d||1);p.dz=(t.z-p.z)/(d||1);if(d<p.speed*dt+t.radius){this._projectileHit(p,t,source);p.dead=true;continue;}}
+    for(const p of this.projectiles){if(p.dead)continue;p.age+=dt;const source=this.getEntity(p.sourceId);if(!source){p.dead=true;continue;}const old=P(p.x,p.z);let trackingHit=null;
+      if(p.targetId){const t=this.getEntity(p.targetId);if(!t?.alive){p.dead=true;continue;}const d=distance(p,t);p.dx=(t.x-p.x)/(d||1);p.dz=(t.z-p.z)/(d||1);if(d<p.speed*dt+t.radius)trackingHit=t;}
       if(p.returning){const d=distance(p,source);p.dx=(source.x-p.x)/(d||1);p.dz=(source.z-p.z)/(d||1);if(d<p.speed*dt+1){p.dead=true;continue;}}
+      if(p.effect==='jinxRocket')p.speed=Math.min(76,42+p.traveled*.2);
       p.x+=p.dx*p.speed*dt;p.z+=p.dz*p.speed*dt;p.traveled+=p.speed*dt;
+      const wall=source.kind!=='tower'&&this.zones.find(zone=>!zone.dead&&zone.type==='yasuo-wall'&&zone.team!==p.team&&zone.until>this.time&&(segmentsCross(old,p,P(zone.fromX,zone.fromZ),P(zone.toX,zone.toZ))||lineDistance(p,P(zone.fromX,zone.fromZ),P(zone.toX,zone.toZ))<zone.radius));
+      if(wall){p.dead=true;this._event('spell',{hero:'yasuo',key:'WALL_BLOCK',source:wall.sourceId,team:wall.team,x:p.x,z:p.z,radius:2,color:'#9cd7e7'});continue;}
+      if(trackingHit){this._projectileHit(p,trackingHit,source);p.dead=true;continue;}
       if(!p.targetId){const candidates=this.entities.filter(e=>e.alive&&e.team!==p.team&&e.kind!=='ward'&&!p.hit.has(e.id)&&(!isStructure(e)||p.hitStructures)&&(!p.heroesOnly||e.kind==='hero'||(p.hitStructures&&isStructure(e)))&&lineDistance(e,old,p)<p.radius+e.radius).sort((a,b)=>distance(a,old)-distance(b,old));for(const e of candidates){this._projectileHit(p,e,source);p.hit.add(e.id);if(p.falloff)p.damage*=p.falloff;if(!p.pierce||(p.maxHits&&p.hit.size>=p.maxHits)){p.dead=true;break;}}}
       if(p.traveled>=p.range&&!p.returning){if(p.returnTo){p.returning=true;p.damageType='true';p.hit.clear();p.traveled=0;}else p.dead=true;}
       if(p.age>12||Math.abs(p.x)>150||Math.abs(p.z)>150)p.dead=true;
@@ -232,26 +221,34 @@ export class Game {
   _projectileHit(p,t,h){
     if(p.group){t.lastVolley=t.lastVolley||{};if(t.lastVolley[p.group])return;t.lastVolley[p.group]=true;}
     if(p.effect==='essence'){t.markedBy=h.id;t.markedUntil=this.time+6;this._event('spell',{key:'MARK',hero:h.heroId,source:h.id,target:t.id,x:t.x,z:t.z,color:'#f1ca66',radius:3});return;}
+    if(p.skill==='attack'&&(p.blindMiss||h.blindUntil>this.time)){if(h.isPlayer)this._event('message',{x:t.x,z:t.z,source:h.id,target:t.id,text:'致盲中 · 普通攻击未命中'});return;}
+    if(p.effect==='jinxRocket'){const scale=.25+.75*clamp(p.traveled/65,0,1);for(const victim of this._combatEnemies({x:t.x,z:t.z,team:h.team},13)){const amount=(p.damage*scale+(victim.maxHp-victim.hp)*p.missingRatio)*(victim.id===t.id?1:.8);this._damage(victim,amount,'physical',h,'R');}this._event('spell',{hero:'jinx',key:'ROCKET_HIT',source:h.id,target:t.id,team:h.team,x:t.x,z:t.z,radius:13,color:'#f6ae70'});return;}
     this._damage(t,p.damage,p.damageType,h,p.skill);
+    if(p.rocket){for(const victim of this._combatEnemies({x:t.x,z:t.z,team:h.team},7,e=>e.id!==t.id))this._damage(victim,p.damage*.8,'physical',h,'ROCKET_ATTACK');this._event('spell',{hero:'jinx',key:'EXPLOSION',source:h.id,target:t.id,team:h.team,x:t.x,z:t.z,radius:7,color:'#e9ae77'});}
     if(!t.alive)return;
     if(p.effect==='charm'){t.charmUntil=this.time+1.5;t.charmSource=h.id;t.slowUntil=this.time+1.5;t.slowPower=.6;}
     if(p.effect==='root'){t.rootUntil=this.time+1.8;t.markedBy=h.id;t.markedUntil=this.time+6;}
     if(p.effect==='slow'||h.heroId==='ashe'){t.slowUntil=this.time+2;t.slowPower=.3;}
+    if(p.effect==='blind')t.blindUntil=this.time+1.6+(h.skillLevels.Q||1)*.2;
+    if(p.effect==='tornado'){this._airborne(t,1.2);this._event('spell',{hero:'yasuo',key:'AIRBORNE',source:h.id,target:t.id,team:h.team,x:t.x,z:t.z,radius:4,color:'#b0e2f2'});}
+    if(p.effect==='zap'){t.slowUntil=this.time+2;t.slowPower=.5;t.revealedUntil=this.time+2;}
     if(p.effect==='iceStun'){t.stunUntil=this.time+clamp(1.5+p.traveled/55,1.5,3.5);for(const e of this._enemies(h,300,e=>!isStructure(e)))if(e.id!==t.id&&distance(e,t)<11){this._damage(e,p.damage*.5,'magic',h,'R');e.slowUntil=this.time+3;e.slowPower=.5;}this._event('spell',{key:'ICE',hero:'ashe',source:h.id,target:t.id,x:t.x,z:t.z,radius:10,color:'#a4e8ff'});}
     if(p.effect==='ezQ'){for(const key of ['Q','W','E','R'])h.cooldowns[key]=Math.max(0,h.cooldowns[key]-1.5);h.ezPassiveUntil=this.time+6;h.ezPassiveStacks=Math.min(5,(h.ezPassiveStacks||0)+1);}
     if(p.skill!=='mark')this._triggerMark(h,t);
     if(p.skill==='attack')this._onAttackHit(h,t,p.damage);
   }
-  _onAttackHit(h,t,amount){if(h.kind!=='hero')return;if(h.lifesteal)h.hp=Math.min(h.maxHp,h.hp+amount*h.lifesteal);if(h.heroId==='ashe'){t.slowUntil=this.time+2;t.slowPower=.25;}if(h.inventory.some(i=>i.id==='blade-ruined')&&!isStructure(t))this._damage(t,t.hp*.07,'physical',h,'item',true);}
+  _onAttackHit(h,t,amount){if(h.kind!=='hero')return;if(h.lifesteal)h.hp=Math.min(h.maxHp,h.hp+amount*h.lifesteal);if(h.heroId==='ashe'){t.slowUntil=this.time+2;t.slowPower=.25;}if(h.heroId==='teemo'&&h.skillLevels.E&&!isStructure(t)&&t.alive){const rank=h.skillLevels.E;this._damage(t,8+rank*8+h.ap*.3,'magic',h,'E');this._poison(t,h,5+rank*5+h.ap*.1,4,'E_POISON');}if(h.inventory.some(i=>i?.id==='blade-ruined')&&!isStructure(t))this._damage(t,t.hp*.07,'physical',h,'item',true);}
   _detonate(zone){if(zone.dead)return;zone.dead=true;const h=this.getEntity(zone.sourceId);if(!h)return;for(const t of this._enemies(zone,zone.radius,e=>!isStructure(e))){this._damage(t,zone.damage,'magic',h,'E');t.markedBy=h.id;t.markedUntil=this.time+6;}this._event('spell',{key:'E2',hero:'lux',source:h.id,team:h.team,x:zone.x,z:zone.z,radius:zone.radius,color:'#efd7ff'});if(h.lightZone===zone)h.lightZone=null;}
   _canHitStructure(t,h){if(t.kind==='tower'){if(t.tier===4)return this.entities.some(e=>e.team===t.team&&e.kind==='inhibitor'&&!e.alive);return !this.entities.some(e=>e.alive&&e.team===t.team&&e.kind==='tower'&&e.lane===t.lane&&e.tier<t.tier);}if(t.kind==='inhibitor')return !this.entities.some(e=>e.alive&&e.team===t.team&&e.kind==='tower'&&e.lane===t.lane);if(t.kind==='nexus')return this.entities.some(e=>e.team===t.team&&e.kind==='inhibitor'&&!e.alive)&&!this.entities.some(e=>e.alive&&e.team===t.team&&e.kind==='tower'&&e.tier===4);return true;}
   _damage(t,amount,type,source,key='',skipMark=false){
     if(!t.alive||t.invulnerableUntil>this.time||amount<=0)return 0;if(isStructure(t)&&(!source||!this._canHitStructure(t,source)))return 0;
+    if(t.heroId==='yasuo'&&t.flow>=100&&source?.kind==='hero'){t.flow=0;this._shield(t,75+t.level*14,1.5);this._event('spell',{hero:'yasuo',key:'FLOW',source:t.id,team:t.team,x:t.x,z:t.z,radius:4,color:'#b4deed'});}
     if(t.kind==='ward'){if(key!=='attack')return 0;amount=1;}
     if(isStructure(t)){const hasWave=this.entities.some(e=>e.alive&&e.kind==='minion'&&e.team===source.team&&distance(e,t)<29);if(!hasWave)amount*=.18;}
-    const resistance=type==='magic'?t.magicResist:type==='physical'?t.armor:0;amount*=100/(100+Math.max(0,resistance||0));if(t.fortifyUntil>this.time)amount*=.65;
+    let resistance=type==='magic'?t.magicResist:type==='physical'?t.armor:0;if(type==='physical'&&source?.heroId==='yasuo'&&source.armorPenUntil>this.time)resistance*=.6;amount*=100/(100+Math.max(0,resistance||0));if(t.fortifyUntil>this.time)amount*=.65;
     if(t.shield>0&&t.shieldUntil>this.time){const absorbed=Math.min(t.shield,amount);t.shield-=absorbed;amount-=absorbed;}
     t.hp=Math.max(0,t.hp-amount);t.lastDamagedAt=this.time;this._cancelRecall(t);
+    if(t.heroId==='teemo')this._breakStealth(t);
     if(source){t.lastAttacker=source.id;if(t.kind==='hero'&&source.kind==='hero'){t.contributors=t.contributors||{};t.contributors[source.id]=this.time;for(const tower of this.entities.filter(e=>e.alive&&e.kind==='tower'&&e.team===t.team&&distance(e,source)<e.attackRange))tower.aggroId=source.id;}if(t.kind==='monster')t.aggroId=source.id;}
     this._event('damage',{x:t.x,z:t.z,target:t.id,source:source?.id,amount:Math.round(amount),team:source?.team,key,color:type==='true'?'#ffffff':type==='magic'?'#bb91ff':'#ffce72'});
     if(t.hp<=0)this._die(t,source);return amount;
@@ -261,12 +258,12 @@ export class Game {
     if(t.kind==='hero'){
       t.deaths++;t.respawnAt=this.time+(this.practice&&t.isPlayer?2:9+t.level*1.6);t.command=t.isPlayer?{type:'stop'}:{type:'ai'};t.recallAt=0;t.lightZone=null;t.spinUntil=0;t.shield=0;
       let h=killer?.kind==='hero'?killer:null;if(!h){const id=Object.entries(t.contributors||{}).filter(([id,at])=>this.time-at<10&&this.getEntity(Number(id))?.kind==='hero').sort((a,b)=>b[1]-a[1])[0]?.[0];h=this.getEntity(Number(id));}
-      if(h&&h.team!==t.team){h.kills++;this.score[h.team]++;this._award(h,300,95);this._event('message',{text:`${h.name} 击杀了 ${t.name}`,team:h.team});for(const[id,at]of Object.entries(t.contributors||{})){const ally=this.getEntity(Number(id));if(ally?.kind==='hero'&&ally.id!==h.id&&ally.team===h.team&&this.time-at<10){ally.assists++;this._award(ally,100,55);}}}t.contributors={};
+      if(h&&h.team!==t.team){h.kills++;this.score[h.team]++;this._award(h,300,95);this._excite(h);this._event('message',{text:`${h.name} 击杀了 ${t.name}`,team:h.team});for(const[id,at]of Object.entries(t.contributors||{})){const ally=this.getEntity(Number(id));if(ally?.kind==='hero'&&ally.id!==h.id&&ally.team===h.team&&this.time-at<10){ally.assists++;this._award(ally,100,55);this._excite(ally);}}}t.contributors={};
     }else if(t.kind==='minion'){
       if(killer?.kind==='hero'){killer.cs++;this._award(killer,t.minionType==='cannon'?60:t.minionType==='super'?80:t.minionType==='melee'?21:14,0);}
       const xp=t.minionType==='melee'?34:t.minionType==='cannon'?60:22;for(const h of this.entities.filter(e=>e.alive&&e.kind==='hero'&&e.team!==t.team&&distance(e,t)<33))this._award(h,0,xp);
     }else if(t.kind==='tower'||t.kind==='inhibitor'){
-      if(killer){for(const h of this.entities.filter(e=>e.kind==='hero'&&e.team===killer.team))this._award(h,t.kind==='tower'?100:35,0);if(killer.kind==='hero')this._award(killer,t.kind==='tower'?150:65,60);}
+      if(killer){for(const h of this.entities.filter(e=>e.kind==='hero'&&e.team===killer.team)){this._award(h,t.kind==='tower'?100:35,0);if(h.heroId==='jinx'&&distance(h,t)<45)this._excite(h);}if(killer.kind==='hero')this._award(killer,t.kind==='tower'?150:65,60);}
       if(t.kind==='inhibitor'){t.respawnAt=this.time+180;this._event('message',{text:`${t.team==='blue'?'蓝':'红'}方${{top:'上路',mid:'中路',bot:'下路'}[t.lane]}水晶被击碎 · 超级士兵即将出击`});}
     }else if(t.kind==='monster'){
       t.respawnAt=this.time+t.respawnTime;
@@ -277,7 +274,7 @@ export class Game {
     }else if(t.kind==='nexus'){this.winner=ENEMY[t.team];this._event('victory',{team:this.winner,text:this.winner==='blue'?'胜利':'失败',x:t.x,z:t.z});}
   }
   _award(h,gold,xp){h.gold+=gold;if(gold&&h.isPlayer)this._event('gold',{x:h.x,z:h.z,source:h.id,amount:gold});if(h.level>=18)return;h.xp+=xp;while(h.xp>=h.xpToNext&&h.level<18){h.xp-=h.xpToNext;this._level(h);}}
-  _level(h){h.level++;h.xpToNext=120+(h.level-1)*65;h.skillPoints++;if(!h.isPlayer||this.practice){const prefer=(h.level===6||h.level===11||h.level===16)?['R','Q','W','E']:h.level===2?['W','Q','E']:h.level===3?['E','Q','W']:['Q','W','E','R'];for(const key of prefer){const rank=h.skillLevels[key],needed=key==='R'?[6,11,16][rank]:rank*2+1;if(rank<(key==='R'?3:5)&&h.level>=needed){this._learn(h,key);break;}}}this._recomputeStats(h);this._event('level',{x:h.x,z:h.z,source:h.id,amount:h.level,text:`${h.name} 升至 ${h.level} 级`,team:h.team});}
+  _level(h){h.level++;h.xpToNext=120+(h.level-1)*65;h.skillPoints++;if(!h.isPlayer||this.practice){const prefer=(h.level===6||h.level===11||h.level===16)?['R','Q','W','E']:h.level===2?['W','Q','E']:h.level===3?['E','Q','W']:['Q','W','E','R'];for(const key of prefer){const rank=h.skillLevels[key],needed=key==='R'?[6,11,16][rank]:rank*2+1;if(rank<(key==='R'?3:5)&&h.level>=needed){this._learn(h,key);break;}}}this._recomputeStats(h);h.hp=Math.min(h.maxHp,h.hp+85);h.mana=Math.min(h.maxMana,h.mana+(h.baseMana?35:0));this._event('level',{x:h.x,z:h.z,source:h.id,amount:h.level,text:`${h.name} 升至 ${h.level} 级`,team:h.team});}
   _spawnWave(){
     this._wave++;for(const team of ['blue','red'])for(const lane of ['top','mid','bot']){
       const path=team==='blue'?LANES[lane]:[...LANES[lane]].reverse(),start=path[0];const types=['melee','melee','melee','ranged','ranged','ranged'];if(this._wave%3===0)types.push('cannon');if(this.entities.some(e=>e.kind==='inhibitor'&&e.team===ENEMY[team]&&e.lane===lane&&!e.alive))types.push('super');
@@ -305,25 +302,38 @@ export class Game {
       const length=distance(e,target),dx=(target.x-e.x)/(length||1),dz=(target.z-e.z)/(length||1),along=(nexus.x-e.x)*dx+(nexus.z-e.z)*dz;
       if(along>0&&along<Math.min(length,20)&&lineDistance(nexus,e,target)<7.6){const px=-dz,pz=dx,side=(e.x-nexus.x)*px+(e.z-nexus.z)*pz>=0?1:-1;target=P(nexus.x+px*10*side,nexus.z+pz*10*side);stopDistance=.4;break;}
     }
-    const d=distance(e,target);if(d<=stopDistance)return;let speed=e.speed||10;if(e.slowUntil>this.time)speed*=1-(e.slowPower||.3);if(e.hasteUntil>this.time)speed*=1.35;if(e.baronEmpowered)speed*=1.15;const step=Math.min(d-stopDistance,speed*dt),next=P(clamp(e.x+(target.x-e.x)/d*step,-120,120),clamp(e.z+(target.z-e.z)/d*step,-120,120));if(e.kind==='hero'&&this.navigation&&!this.navigation.segmentClear(e,next)){e._route=null;return;}e.x=next.x;e.z=next.z;e.facing=Math.atan2(target.z-e.z,target.x-e.x);e.moving=true;
+    const d=distance(e,target);if(d<=stopDistance)return;let speed=e.speed||10;if(e.slowUntil>this.time)speed*=1-(e.slowPower||.3);if(e.hasteUntil>this.time)speed*=1.35;if(e.baronEmpowered)speed*=1.15;if(e.excitedUntil>this.time)speed*=1.65;if(e.heroId==='teemo'){if(e.teemoRunUntil>this.time)speed*=1.4;else if(e.skillLevels.W&&this.time-e.lastDamagedAt>5)speed*=1.1+e.skillLevels.W*.015;}const step=Math.min(d-stopDistance,speed*dt),next=P(clamp(e.x+(target.x-e.x)/d*step,-120,120),clamp(e.z+(target.z-e.z)/d*step,-120,120));if(e.kind==='hero'&&this.navigation&&!this.navigation.segmentClear(e,next)){e._route=null;return;}e.x=next.x;e.z=next.z;e.facing=Math.atan2(target.z-e.z,target.x-e.x);e.moving=true;if(e.heroId==='yasuo')e.flow=Math.min(100,(e.flow||0)+step*3.5);
   }
   _attack(e,t){
-    if(!t?.alive||e.attackCooldown>0||e.stunUntil>this.time||e.invulnerableUntil>this.time||distance(e,t)>e.attackRange+t.radius)return false;
+    if(!t?.alive||e.attackCooldown>0||e.stunUntil>this.time||e.airborneUntil>this.time||e.invulnerableUntil>this.time||distance(e,t)>e.attackRange+t.radius)return false;
+    if(['hero','minion','tower'].includes(e.kind)&&!this.isVisible(t,e.team))return false;
     if(isStructure(t)&&!this._canHitStructure(t,e))return false;
     let speed=e.kind==='hero'?e.attackSpeed:e.kind==='tower'?.8:e.kind==='monster'?.7:.85;
     if(e.kind==='hero'){if(e.heroId==='ashe'&&e.qUntil>this.time)speed*=1.65;if(e.ezPassiveUntil>this.time)speed*=1+(e.ezPassiveStacks||1)*.1;}
+    if(e.excitedUntil>this.time)speed*=1.65;if(e.ambushUntil>this.time)speed*=1.4;
+    if(e.heroId==='jinx'){if(e.rocketMode&&e.mana<20){e.rocketMode=false;e.attackRange=CHAMP.jinx.attackRange;}if(e.rocketMode){e.mana-=20;speed*=.9;}else{e.minigunStacks=Math.min(3,(e.minigunStacks||0)+1);e.minigunUntil=this.time+3;speed*=1+e.minigunStacks*(.1+(e.skillLevels.Q||1)*.025);}}
     e.attackCooldown=1/speed;e.facing=Math.atan2(t.z-e.z,t.x-e.x);e.lastAttackAt=this.time;let amount=(e.attack||20)+(e.baronUntil>this.time?20:0);if(e.baronEmpowered)amount*=1.5;
-    const critical=e.kind==='hero'&&Math.random()<e.crit;if(critical)amount*=1.75+e.critPower;if(e.heroId==='ashe'&&e.qUntil>this.time)amount*=1.28;if(e.heroId==='garen'&&e.qUntil>this.time){amount+=45+e.level*6;e.qUntil=0;t.silenceUntil=this.time+1.4;}
+    const critical=e.kind==='hero'&&Math.random()<e.crit;if(critical)amount*=(1.75+e.critPower)*(e.heroId==='yasuo'?.9:1);if(e.heroId==='jinx'&&e.rocketMode)amount*=1.1;if(e.heroId==='ashe'&&e.qUntil>this.time)amount*=1.28;if(e.heroId==='garen'&&e.qUntil>this.time){amount+=45+e.level*6;e.qUntil=0;t.silenceUntil=this.time+1.4;}
     if(e.kind==='tower'&&t.kind==='hero'){e.focusStacks=e.lastTargetId===t.id?Math.min(4,(e.focusStacks||0)+1):0;amount*=1+e.focusStacks*.25;}e.lastTargetId=t.id;
-    this._event('attack',{source:e.id,target:t.id,hero:e.heroId,team:e.team,key:'attack',x:t.x,z:t.z,fromX:e.x,fromZ:e.z,toX:t.x,toZ:t.z,color:critical?'#ffc763':e.team==='blue'?'#55ceea':'#fc6978'});
-    if(e.attackRange>8)this._tracking(e,t,amount,'physical');else{this._damage(t,amount,'physical',e,'attack');this._triggerMark(e,t);this._onAttackHit(e,t,amount);}
+    this._breakStealth(e);this._event('attack',{source:e.id,target:t.id,hero:e.heroId,team:e.team,key:'attack',rocket:e.heroId==='jinx'&&e.rocketMode,x:t.x,z:t.z,fromX:e.x,fromZ:e.z,toX:t.x,toZ:t.z,color:critical?'#ffc763':e.team==='blue'?'#55ceea':'#fc6978'});
+    if(e.attackRange>8){const p=this._tracking(e,t,amount,'physical');p.blindMiss=e.blindUntil>this.time;if(e.heroId==='jinx'&&e.rocketMode){p.rocket=true;p.radius=1;p.speed=42;}}
+    else if(e.blindUntil>this.time){if(e.isPlayer)this._event('message',{text:'致盲中 · 普通攻击未命中'});}
+    else{this._damage(t,amount,'physical',e,'attack');this._triggerMark(e,t);this._onAttackHit(e,t,amount);}
     if(e.redBuffUntil>this.time&&t.kind==='hero'){t.slowUntil=this.time+2;t.slowPower=.3;this._damage(t,10+e.level*2,'true',e,'red-buff');}
     return true;
   }
   _heroUpdate(h,dt){
     h.spinning=h.spinUntil>this.time;
-    for(const key of Object.keys(h.cooldowns))h.cooldowns[key]=Math.max(0,h.cooldowns[key]-dt*(this.practice&&h.isPlayer?3:1));for(const slot of h.inventory)slot.cooldown=Math.max(0,(slot.cooldown||0)-dt*(this.practice?3:1));
-    if(!h.alive){if(this.time>=h.respawnAt){h.alive=true;h.hp=h.maxHp;h.mana=h.maxMana;h.x=h.spawnX;h.z=h.spawnZ;h.command=h.isPlayer?{type:'stop'}:{type:'ai'};for(const key of BUFFS)h[key]=0;h.charmUntil=0;this._event('message',{text:`${h.name} 已复活`,team:h.team});}return;}
+    if(h.heroId==='yasuo'&&h.qStackUntil<this.time)h.qStacks=0;
+    if(h.heroId==='jinx'&&h.minigunUntil<this.time)h.minigunStacks=0;
+    if(h.heroId==='teemo'){
+      const moved=Math.hypot(h.x-(h._stillX??h.x),h.z-(h._stillZ??h.z))>.025,bush=BUSHES.some(b=>distance(h,b)<8);
+      if(moved&&!bush){this._breakStealth(h);}else if(this.time-(h.lastActionAt||0)>.1&&this.time-h.lastDamagedAt>2){h.stealthStill=(h.stealthStill||0)+dt;if(h.stealthStill>2)h.stealthed=true;}
+      h._stillX=h.x;h._stillZ=h.z;
+      if(h.skillLevels.R&&h.shroomCharges<3){h.shroomRecharge+=dt*(this.practice&&h.isPlayer?3:1);const recharge=28-h.skillLevels.R*4;if(h.shroomRecharge>=recharge){h.shroomRecharge-=recharge;h.shroomCharges++;}}else h.shroomRecharge=0;
+    }
+    for(const key of Object.keys(h.cooldowns))h.cooldowns[key]=Math.max(0,h.cooldowns[key]-dt*(this.practice&&h.isPlayer?3:1));for(const slot of h.inventory)if(slot)slot.cooldown=Math.max(0,(slot.cooldown||0)-dt*(this.practice?3:1));
+    if(!h.alive){if(this.time>=h.respawnAt){h.alive=true;h.hp=h.maxHp;h.mana=h.maxMana;h.x=h.spawnX;h.z=h.spawnZ;h.command=h.isPlayer?{type:'stop'}:{type:'ai'};for(const key of BUFFS)h[key]=0;h.charmUntil=0;h.poisons={};h.stealthed=false;h.stealthStill=0;this._event('message',{text:`${h.name} 已复活`,team:h.team});}return;}
     h.gold+=dt*1.7;if(h.wardCharges<2){h.wardTimer+=dt;if(h.wardTimer>80){h.wardTimer=0;h.wardCharges++;}}else h.wardTimer=0;
     const fountain=this._nearBase(h),healingPenalty=h.igniteUntil>this.time?.6:1;h.hp=Math.min(h.maxHp,h.hp+dt*(fountain?h.maxHp*.18:1.1+(h.heroId==='garen'&&this.time-h.lastDamagedAt>7?h.maxHp*.012:0))*healingPenalty);h.mana=Math.min(h.maxMana,h.mana+dt*(fountain?h.maxMana*.2:2+h.manaRegen+(h.blueBuffUntil>this.time?9:0)));if(this.practice&&h.isPlayer)h.mana=h.maxMana;
     if(h.potionUntil>this.time)h.hp=Math.min(h.maxHp,h.hp+25*dt*healingPenalty);
@@ -331,7 +341,7 @@ export class Game {
     if(h.igniteUntil>this.time&&h.igniteTick<=this.time){h.igniteTick+=1;this._damage(h,h.igniteDamage,'true',this.getEntity(h.igniteSource),'F');if(!h.alive)return;}
     if(h.recallAt){if(this.time>=h.recallAt){h.x=h.spawnX;h.z=h.spawnZ;h.recallAt=0;h.command=h.isPlayer?{type:'stop'}:{type:'ai'};this._event('recall',{source:h.id,x:h.x,z:h.z,team:h.team,text:'回城完成'});}return;}
     if(h.spinUntil>this.time&&h.spinTick<=this.time){h.spinTick+=.35;for(const t of this._enemies(h,9,e=>!isStructure(e)))this._damage(t,h.spinDamage,'physical',h,'E');this._event('spell',{source:h.id,hero:'garen',key:'SPIN',x:h.x,z:h.z,radius:8,team:h.team,color:'#f1d77f'});}
-    if(h.inventory.some(i=>i.id==='sunfire')&&this._tick<=0)for(const t of this._enemies(h,7,e=>!isStructure(e)))this._damage(t,12+h.level*2,'magic',h,'sunfire');
+    if(h.inventory.some(i=>i?.id==='sunfire')&&this._tick<=0)for(const t of this._enemies(h,7,e=>!isStructure(e)))this._damage(t,12+h.level*2,'magic',h,'sunfire');
     if(h.stunUntil>this.time||h.invulnerableUntil>this.time)return;
     if(h.charmUntil>this.time){const charmer=this.getEntity(h.charmSource);if(charmer)this._walk(h,charmer,dt,3);return;}
     if(!h.isPlayer){this._aiHero(h,dt);return;}
@@ -354,19 +364,26 @@ export class Game {
     if(h.retreatUntil>this.time||health<.35&&this._nearBase(h)){this._walk(h,BASE[h.team],dt,4);if(this._nearBase(h))h.retreatUntil=0;return;}
     if(health<.42&&this.time-h.lastDamagedAt>6&&!this._nearBase(h)){h.recallAt=this.time+6;h.command={type:'ai'};this._event('recall',{x:h.x,z:h.z,source:h.id,team:h.team});return;}
     if(this.time>(h.aiWardNext||45)&&Math.abs(h.x+h.z)<55&&!this._nearBase(h)&&h.wardCharges>0){h.aiWardNext=this.time+65;h.wardCharges--;this._addWard(h,h.x+4,h.z-4,false);}
-    if(this._nearBase(h)&&h.gold>1200&&h.inventory.length<6){const item=(h.heroId==='ahri'||h.heroId==='lux')?'doran-ring':'doran-blade';if(!h.inventory.length){h.inventory.push({id:item,count:1,cooldown:0});h.gold-=ITEM[item].cost;}else if(h.gold>ITEM.ludens.cost&&!h.inventory.some(s=>s.id==='ludens')&&['ahri','lux'].includes(h.heroId)){h.inventory.push({id:'ludens',count:1,cooldown:0});h.gold-=ITEM.ludens.cost;}else if(h.gold>3200&&!h.inventory.some(s=>s.id==='blade-ruined')){h.inventory.push({id:'blade-ruined',count:1,cooldown:0});h.gold-=3200;}this._recomputeStats(h);}
-    let target=this.getEntity(h.aiTargetId);
+    if(this._nearBase(h)&&h.gold>1200&&h.inventory.some(s=>!s)){const mage=['ahri','lux','teemo'].includes(h.heroId);let item=!h.inventory.some(Boolean)?(mage?'doran-ring':'doran-blade'):mage&&!h.inventory.some(s=>s?.id==='ludens')?'ludens':!h.inventory.some(s=>s?.id==='blade-ruined')?'blade-ruined':null;if(item&&buyEquipment(h,item,{canShop:true}).ok)this._recomputeStats(h);}
+    let target=this.getEntity(h.aiTargetId);if(target&&!this.isVisible(target,h.team))target=null;
     if(h.aiThink<=0||!target?.alive){h.aiThink=.3+Math.random()*.2;target=this._nearest(h,36,e=>e.kind!=='nexus'||this._canHitStructure(e,h),h.lane==='jungle');h.aiTargetId=target?.id||0;}
     if(target?.alive){
       const hostileTower=this.entities.find(e=>e.alive&&e.kind==='tower'&&e.team===ENEMY[h.team]&&distance(e,h)<e.attackRange+4);const friendlyWave=hostileTower&&this.entities.some(e=>e.alive&&e.kind==='minion'&&e.team===h.team&&distance(e,hostileTower)<24);
       if(hostileTower&&!friendlyWave&&target.kind!=='hero'){const p=pathPoint(h.lane==='jungle'?'mid':h.lane,h.team==='blue'?.22:.78);this._walk(h,p,dt);return;}
-      const d=distance(h,target);if(d<h.attackRange-3&&h.heroId!=='garen'&&target.kind==='hero'&&target.attackRange<10){const away=P(h.x+(h.x-target.x)*.8,h.z+(h.z-target.z)*.8);this._walk(h,away,dt);}
+      const d=distance(h,target);if(d<h.attackRange-3&&!['garen','yasuo'].includes(h.heroId)&&target.kind==='hero'&&target.attackRange<10){const away=P(h.x+(h.x-target.x)*.8,h.z+(h.z-target.z)*.8);this._walk(h,away,dt);}
       else if(d>h.attackRange+target.radius-.5)this._walk(h,target,dt,h.attackRange+target.radius-1);
       this._attack(h,target);
       if(target.kind==='hero'||target.kind==='monster'||this.practice){
         if(h.heroId==='garen'){if(d<11)this._cast(h,'E',target.x,target.z,target.id);if(d<20)this._cast(h,'Q',target.x,target.z,target.id);if(health<.65)this._cast(h,'W',h.x,h.z);if(target.kind==='hero'&&target.hp/target.maxHp<.38&&d<17)this._cast(h,'R',target.x,target.z,target.id);}
+        else if(h.heroId==='yasuo'){if(d<(h.qStacks>=2?47:20))this._cast(h,'Q',target.x,target.z,target.id);if(d<20&&d>8&&!((h.dashLocks[target.id]||0)>this.time))this._cast(h,'E',target.x,target.z,target.id);if(this.projectiles.some(p=>p.team!==h.team&&distance(p,h)<26))this._cast(h,'W',target.x,target.z,target.id);if(target.airborneUntil>this.time)this._cast(h,'R',target.x,target.z,target.id);}
+        else if(h.heroId==='teemo'){if(d<31)this._cast(h,'Q',target.x,target.z,target.id);if(d>17||health<.5)this._cast(h,'W',h.x,h.z);if(h.skillLevels.R&&this.time>(h.aiShroomNext||0)&&d<31){if(this._cast(h,'R',target.x,target.z,target.id))h.aiShroomNext=this.time+5;}}
+        else if(h.heroId==='jinx'){const clustered=this._combatEnemies({x:target.x,z:target.z,team:h.team},10).length>=2,wantRocket=d>24||clustered;if(wantRocket!==h.rocketMode&&h.mana>70)this._cast(h,'Q',h.x,h.z);if(d<60)this._cast(h,'W',target.x,target.z,target.id);if(target.kind==='hero'&&d<28)this._cast(h,'E',target.x,target.z,target.id);if(target.kind==='hero'&&target.hp/target.maxHp<.55&&d>15)this._cast(h,'R',target.x,target.z,target.id);}
         else{if(d<48)this._cast(h,'Q',target.x,target.z,target.id);if(d<42&&h.heroId!=='ashe')this._cast(h,'E',target.x,target.z,target.id);if(d<36)this._cast(h,'W',target.x,target.z,target.id);if(target.kind==='hero'&&target.hp/target.maxHp<.58&&d<48)this._cast(h,'R',target.x,target.z,target.id);}
-      }else if(target.kind==='minion'&&d<45&&h.mana>h.maxMana*.55&&Math.random()<dt*.35)this._cast(h,'Q',target.x,target.z,target.id);
+      }else if(target.kind==='minion'){
+        if(h.heroId==='yasuo'&&d<(h.qStacks>=2?47:20))this._cast(h,'Q',target.x,target.z,target.id);
+        else if(h.heroId==='jinx'){const crowded=this.entities.filter(e=>e.alive&&e.kind==='minion'&&e.team!==h.team&&distance(e,target)<8).length>=3;if(crowded!==h.rocketMode&&h.mana>h.maxMana*.4)this._cast(h,'Q',h.x,h.z);}
+        else if(d<45&&h.mana>h.maxMana*.55&&Math.random()<dt*.35)this._cast(h,'Q',target.x,target.z,target.id);
+      }
       return;
     }
     if(h.lane==='jungle'){
@@ -381,24 +398,36 @@ export class Game {
     e.baronEmpowered=this.entities.some(h=>h.alive&&h.kind==='hero'&&h.team===e.team&&h.baronUntil>this.time&&distance(h,e)<42);
     if(e.spawnWait>0){e.spawnWait-=dt;return;}if(e.stunUntil>this.time)return;
     if(e.charmUntil>this.time){const charmer=this.getEntity(e.charmSource);if(charmer)this._walk(e,charmer,dt,3);return;}
-    let t=this.getEntity(e.targetId);if(!t?.alive||distance(e,t)>29||isStructure(t)&&!this._canHitStructure(t,e))t=null;
-    if(!t){const targets=this._enemies(e,23,x=>x.kind!=='monster'&&(!isStructure(x)||this._canHitStructure(x,e)));targets.sort((a,b)=>(a.kind==='minion'?-10:a.kind==='hero'?-5:0)+distance(e,a)-((b.kind==='minion'?-10:b.kind==='hero'?-5:0)+distance(e,b)));t=targets[0];e.targetId=t?.id||0;}
+    let t=this.getEntity(e.targetId);if(!t?.alive||distance(e,t)>29||!this.isVisible(t,e.team)||isStructure(t)&&!this._canHitStructure(t,e))t=null;
+    if(!t){const targets=this._enemies(e,23,x=>x.kind!=='monster'&&this.isVisible(x,e.team)&&(!isStructure(x)||this._canHitStructure(x,e)));targets.sort((a,b)=>(a.kind==='minion'?-10:a.kind==='hero'?-5:0)+distance(e,a)-((b.kind==='minion'?-10:b.kind==='hero'?-5:0)+distance(e,b)));t=targets[0];e.targetId=t?.id||0;}
     if(t){if(distance(e,t)>e.attackRange+t.radius-.2)this._walk(e,t,dt,e.attackRange+t.radius-.4);this._attack(e,t);return;}
     const point=e.path[e.pathIndex];if(point){this._walk(e,point,dt,.2);if(distance(e,point)<1)e.pathIndex++;}else{const nexus=this.entities.find(x=>x.kind==='nexus'&&x.team===ENEMY[e.team]&&x.alive);if(nexus)this._attack(e,nexus);}
   }
-  _towerUpdate(e){if(e.attackCooldown>0)return;let target=this.getEntity(e.aggroId);if(!target?.alive||distance(e,target)>e.attackRange+target.radius)target=null;if(!target){const near=this._enemies(e,e.attackRange,t=>t.kind==='minion'||t.kind==='hero');near.sort((a,b)=>(a.kind==='minion'?-100:0)+distance(e,a)-((b.kind==='minion'?-100:0)+distance(e,b)));target=near[0];}if(target)this._attack(e,target);}
+  _towerUpdate(e){if(e.attackCooldown>0)return;let target=this.getEntity(e.aggroId);if(!target?.alive||distance(e,target)>e.attackRange+target.radius||!this.isVisible(target,e.team)){target=null;e.aggroId=0;}if(!target){const near=this._enemies(e,e.attackRange,t=>(t.kind==='minion'||t.kind==='hero')&&this.isVisible(t,e.team));near.sort((a,b)=>(a.kind==='minion'?-100:0)+distance(e,a)-((b.kind==='minion'?-100:0)+distance(e,b)));target=near[0];}if(target)this._attack(e,target);}
   _monsterUpdate(e,dt){if(e.charmUntil>this.time){const charmer=this.getEntity(e.charmSource);if(charmer)this._walk(e,charmer,dt,3);return;}if(e.stunUntil>this.time)return;const t=this.getEntity(e.aggroId),home=P(e.homeX,e.homeZ);if(t?.alive&&distance(e,t)<34&&distance(e,home)<25){if(distance(e,t)>e.attackRange+t.radius)this._walk(e,t,dt,e.attackRange+t.radius-.4);this._attack(e,t);}else{e.aggroId=null;if(distance(e,home)>1)this._walk(e,home,dt);if(this.time-e.lastDamagedAt>2)e.hp=Math.min(e.maxHp,e.hp+e.maxHp*.15*dt);}}
   update(dt){
     if(this.winner||!Number.isFinite(dt)||dt<=0)return;dt=Math.min(dt,.1);this.time+=dt;this._tick-=dt;
     if(this.time>=this._nextWave){this._spawnWave();this._nextWave+=26;}
     for(const e of [...this.entities]){
       e.moving=false;e.attackCooldown=Math.max(0,(e.attackCooldown||0)-dt);
+      if(e.alive){this._statusUpdate(e);if(!e.alive)continue;}
       if(e.kind==='hero'){this._heroUpdate(e,dt);continue;}
       if(!e.alive){if((e.kind==='monster'||e.kind==='inhibitor')&&e.respawnAt>0&&this.time>=e.respawnAt){e.alive=true;e.hp=e.maxHp;e.x=e.homeX??e.x;e.z=e.homeZ??e.z;e.respawnAt=0;e.aggroId=null;}continue;}
       if(e.kind==='minion')this._minionUpdate(e,dt);else if(e.kind==='tower')this._towerUpdate(e);else if(e.kind==='monster')this._monsterUpdate(e,dt);else if(e.kind==='ward'&&this.time>e.expiresAt)e.alive=false;
     }
     this._projectiles(dt);
-    for(const zone of this.zones){if(zone.dead)continue;if(zone.until<this.time){this._detonate(zone);continue;}for(const e of this._enemies(zone,zone.radius,t=>!isStructure(t))){e.slowUntil=this.time+.25;e.slowPower=.3;}}
+    for(const zone of this.zones){
+      if(zone.dead)continue;if(zone.until<this.time){if(zone.type==='lux')this._detonate(zone);else zone.dead=true;continue;}
+      if(zone.type==='yasuo-wall')continue;
+      if(zone.type==='teemo-mushroom'||zone.type==='jinx-chompers'){
+        if(zone.armedAt>this.time)continue;const h=this.getEntity(zone.sourceId);if(!h)continue;const target=this._combatEnemies(zone,zone.radius,e=>zone.type==='teemo-mushroom'||e.kind==='hero')[0];if(!target)continue;
+        zone.dead=true;zone.triggered=true;zone.revealedUntil=this.time+1;
+        if(zone.type==='teemo-mushroom'){for(const victim of this._combatEnemies(zone,11)){this._damage(victim,zone.damage,'magic',h,'R');this._poison(victim,h,zone.poisonDps,4,'R_POISON');victim.slowUntil=this.time+4;victim.slowPower=.45;victim.revealedUntil=this.time+4;}this._event('spell',{hero:'teemo',key:'MUSHROOM',source:h.id,target:target.id,team:h.team,x:zone.x,z:zone.z,radius:11,color:'#a3d663'});}
+        else{target.rootUntil=this.time+1.5;this._damage(target,zone.damage,'magic',h,'E');this._event('spell',{hero:'jinx',key:'TRAP',source:h.id,target:target.id,team:h.team,x:zone.x,z:zone.z,radius:4,color:'#f0a1d6'});}
+        continue;
+      }
+      for(const e of this._enemies(zone,zone.radius,t=>!isStructure(t))){e.slowUntil=this.time+.25;e.slowPower=.3;}
+    }
     this.zones=this.zones.filter(z=>!z.dead);this.reveals=this.reveals.filter(r=>r.until>this.time);
     if(this._tick<=0)this._tick=.5;
     // Dead soldiers are short lived; retain heroes and objectives for respawn / HUD.
