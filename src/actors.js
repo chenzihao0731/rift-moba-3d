@@ -170,7 +170,18 @@ export class Actors {
     if(dt>0){data.body.position.y=moving?Math.sin(time*13)*.12:Math.sin(time*2)*.05;(data.legs||[]).forEach((l,i)=>l.rotation.x=moving?Math.sin(time*12+i*Math.PI)*.5:0);(data.tails||[]).forEach((t,i)=>t.rotation.z=Math.sin(time*2+i*.55)*.11);(data.braids||[]).forEach((b,i)=>b.rotation.x=Math.sin(time*3+i)*.07+(moving?.16:0));if(data.ponytail)data.ponytail.rotation.x=Math.sin(time*3)*.06+(moving?.15:0);if(data.scarf)data.scarf.rotation.x=Math.sin(time*3.5)*.08+(moving?.2:0);}
     const spinning=e.spinUntil>game.time||e.spinning;if(spinning)data.body.rotation.y+=dt*15;else data.body.rotation.y=0;
     if(data.spinRing){data.spinRing.visible=!!spinning;data.sword.rotation.z=spinning?-Math.PI/2:-.24;}
-    if(e.heroId==='yasuo'&&data.sword&&a.swingUntil>game.time)data.sword.rotation.z=-.62-Math.sin((a.swingUntil-game.time)*Math.PI/.35)*1.25;else if(e.heroId==='yasuo'&&data.sword)data.sword.rotation.z=-.62;
+    if(e.heroId==='yasuo'&&data.sword){
+     const sword=data.sword,action=a.swordAction;sword.position.set(1.17,1.95,.55);sword.rotation.set(0,0,-.62);sword.scale.setScalar(1);data.body.rotation.x=0;data.body.position.z=0;
+     if(action){action.age+=dt;const t=Math.min(1,action.age/action.duration),lunge=Math.sin(t*Math.PI);
+      if(action.mode==='thrust'){
+       sword.rotation.set(Math.PI/2,0,-.1);sword.position.set(.75,2.1,.6+lunge*1.8);sword.scale.y=1+lunge*.2;data.body.rotation.x=lunge*.09;data.body.position.z=lunge*.42;
+      }else if(action.mode==='spin'){
+       data.body.rotation.y=t*Math.PI*2;sword.rotation.set(.18,0,-Math.PI/2);sword.position.set(1.2,2.2,.7);
+      }else if(action.mode==='swing')sword.rotation.z=-.62-lunge*1.25;
+      else if(action.mode==='dash'){sword.rotation.set(.4,0,-1.4);data.body.rotation.x=lunge*.15;}
+      if(t>=1)a.swordAction=null;
+     }
+    }
     if(data.rocket)data.rocket.visible=!!e.rocketMode;
     if(data.shield){data.shield.visible=e.shield>0&&e.shieldUntil>game.time;data.shield.material.opacity=.12+Math.sin(time*4)*.025;}
     if(dt>0&&active){
@@ -219,7 +230,18 @@ export class Actors {
   const from=new THREE.Vector3(e.fromX??source?.x??x,2.5,e.fromZ??source?.z??z),to=new THREE.Vector3(e.toX??x,2.5,e.toZ??z),fx=this.effects;
   if(e.type==='damage'){this.floating(x,z,Math.round(e.amount||0),e.team==='blue'?'#ffe9b9':'#ff8b8b');fx.burst(x,1.8,z,c,8,4,.32);}
   if(e.type==='gold')this.floating(x,z,`+${e.amount||0} 金币`,'#e8c775');
-  if(['attack','spell'].includes(e.type)){const actor=this.map.get(e.source),dx=to.x-from.x,dz=to.z-from.z;if(actor&&Math.hypot(dx,dz)>.1){actor.aimAngle=Math.atan2(dx,dz);actor.aimUntil=(this.game?.time||0)+.5;if(hero==='yasuo')actor.swingUntil=(this.game?.time||0)+.35;}}
+  if(['attack','spell'].includes(e.type)){
+   const actor=this.map.get(e.source),dx=to.x-from.x,dz=to.z-from.z;
+   if(actor&&Math.hypot(dx,dz)>.1){actor.aimAngle=Math.atan2(dx,dz);actor.aimUntil=(this.game?.time||0)+.5;}
+   if(actor&&hero==='yasuo'){
+    if(e.type==='attack')actor.swordAction={mode:'swing',age:0,duration:.28};
+    else if(['Q','Q3'].includes(e.key)){
+     actor.swordAction={mode:'thrust',age:0,duration:.32};
+     if(Math.hypot(dx,dz)>.1)actor.mesh.rotation.y=actor.aimAngle;
+    }else if(['EQ','EQ3'].includes(e.key))actor.swordAction={mode:'spin',age:0,duration:.5};
+    else if(e.key==='E')actor.swordAction={mode:'dash',age:0,duration:.28};
+   }
+  }
   if(e.type==='attack'){
    if(!liveMissiles)this.bolt(from,to,c,.23,.22);
    else if(source?.attackRange<=8)fx.slash(from.x,from.z,hero==='yasuo'?0xa6fbe9:c,hero==='garen'?3.3:2.7,Math.atan2(to.x-from.x,to.z-from.z),.23);
@@ -244,8 +266,18 @@ export class Actors {
     fx.rune(x,z,0xbffff3,4,.85);fx.burst(x,.3,z,0xbffcf5,32,9,.8);
    }else if(hero==='yasuo'&&e.key==='FLOW'){
     fx.rune(x,z,0xb9edff,3.3,1.1);fx.burst(x,1.8,z,0xc5ffff,24,5,.8);
-   }else if(hero==='yasuo'&&['Q','E','WALL_BLOCK'].includes(e.key)){
-    if(e.key==='WALL_BLOCK'){fx.burst(x,2,z,0xcbfff8,30,9,.55);fx.ring(x,z,0x91eadb,2,.4);}else{fx.slash(from.x,from.z,0xa2f4e7,e.key==='Q'?5:3.2,Math.atan2(to.x-from.x,to.z-from.z),.35);if(e.key==='E')fx.lineBurst(from,to,0x9af4e7,24,1,.5);}
+   }else if(hero==='yasuo'&&e.key==='Q'){
+    fx.thrust(new THREE.Vector3(from.x,2.1,from.z),new THREE.Vector3(to.x,2.1,to.z),0xa2f4e7,.95,.32);
+   }else if(hero==='yasuo'&&e.key==='Q3'){
+    const direction=to.clone().sub(from),length=direction.length();
+    const tip=from.clone().addScaledVector(direction,length>.01?Math.min(8,length)/length:0);from.y=tip.y=2.1;
+    fx.thrust(from,tip,0xb6ffff,.75,.3);fx.lineBurst(from,tip,0xbafff5,14,.25,.35);
+   }else if(hero==='yasuo'&&['EQ','EQ3'].includes(e.key)){
+    fx.swordSpin(x,z,e.key==='EQ3'?0x97f5ff:0xb8ffdf,e.radius||9,e.key==='EQ3');
+   }else if(hero==='yasuo'&&e.key==='E'){
+    fx.lineBurst(from,to,0x9af4e7,24,.65,.45);
+   }else if(hero==='yasuo'&&e.key==='WALL_BLOCK'){
+    fx.burst(x,2,z,0xcbfff8,30,9,.55);fx.ring(x,z,0x91eadb,2,.4);
    }else if(hero==='yasuo'&&e.key==='W'){fx.rune(from.x,from.z,0x9feddf,3,.5);
    }else if(e.key==='MUSHROOM'){
     fx.rune(x,z,0xa2e353,e.radius||9,1.1);fx.burst(x,.5,z,0xa0e64f,90,13,1.4);fx.burst(x,1,z,0xe4ab5b,35,6,.9,8);

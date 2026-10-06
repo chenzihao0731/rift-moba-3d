@@ -180,11 +180,28 @@ export class Game {
       if(key==='R')this._projectile(h,dir,{skill:'R',range:240,speed:50,radius:5,damage:220+rank*100+h.attack*.7+ap*.9,damageType:'magic',pierce:true,falloff:.93});
     }else if(h.heroId==='yasuo'){
       if(key==='Q'){
-        const damage=25+rank*18+h.attack*1.05;if(h.qStacks>=2&&h.qStackUntil>this.time){h.qStacks=0;this._projectile(h,dir,{skill:'Q3',range:47,speed:32,radius:3,damage,damageType:'physical',pierce:true,effect:'tornado'});spell.key='Q3';spell.toX=h.x+dir.x*47;spell.toZ=h.z+dir.z*47;}
-        else{if(h.qStackUntil<this.time)h.qStacks=0;const spinning=h.dashComboUntil>this.time,end=P(h.x+dir.x*18,h.z+dir.z*18);let hit=false;for(const t of this._combatEnemies(h,spinning?10:22))if(spinning?distance(h,t)<10+t.radius:lineDistance(t,h,end)<2+t.radius){this._damage(t,damage,'physical',h,'Q');hit=true;}if(hit){h.qStacks=Math.min(2,h.qStacks+1);h.qStackUntil=this.time+7;}spell.toX=spinning?h.x:end.x;spell.toZ=spinning?h.z:end.z;spell.radius=spinning?10:2;}
+        if(h.qStackUntil<=this.time)h.qStacks=0;
+        const damage=25+rank*18+h.attack*1.05,tornado=h.qStacks>=2,spinning=h.dashComboUntil>this.time;
+        // One E grants one circular Q. A following Q requires another dash.
+        h.dashComboUntil=0;h.facing=Math.atan2(dir.z,dir.x);
+        if(tornado)h.qStacks=0;
+        if(tornado&&!spinning){this._projectile(h,dir,{skill:'Q3',shape:'tornado',range:47,speed:32,radius:3,damage,damageType:'physical',pierce:true,effect:'tornado'});spell.key='Q3';spell.shape='tornado';spell.toX=h.x+dir.x*47;spell.toZ=h.z+dir.z*47;spell.radius=3;}
+        else{
+          const end=P(h.x+dir.x*18,h.z+dir.z*18),radius=spinning?9:1.25;let hit=false;
+          spell.key=spinning?(tornado?'EQ3':'EQ'):'Q';spell.shape=spinning?(tornado?'spin-knockup':'spin'):'thrust';spell.x=h.x;spell.z=h.z;
+          for(const t of this._combatEnemies(h,spinning?radius:22)){
+            const dx=t.x-h.x,dz=t.z-h.z,along=dx*dir.x+dz*dir.z,across=Math.abs(dx*dir.z-dz*dir.x);
+            const collides=spinning?distance(h,t)<radius+t.radius:along>0&&along<=18+t.radius&&across<radius+t.radius;
+            if(!collides)continue;
+            this._damage(t,damage,'physical',h,spell.key);hit=true;
+            if(tornado&&t.alive){this._airborne(t,1.2);this._event('spell',{hero:'yasuo',key:'AIRBORNE',source:h.id,target:t.id,team:h.team,x:t.x,z:t.z,radius:4,color:'#b0e2f2'});}
+          }
+          if(hit&&!tornado){h.qStacks=Math.min(2,h.qStacks+1);h.qStackUntil=this.time+7;}
+          spell.toX=spinning?h.x:end.x;spell.toZ=spinning?h.z:end.z;spell.radius=radius;
+        }
       }
       if(key==='W'){const center=P(h.x+dir.x*8,h.z+dir.z*8),half=9+rank;this._zone('yasuo-wall',h,{...center,fromX:center.x-dir.z*half,fromZ:center.z+dir.x*half,toX:center.x+dir.z*half,toZ:center.z-dir.x*half,radius:1.5,until:this.time+4});spell.x=center.x;spell.z=center.z;spell.toX=center.x-dir.z*half;spell.toZ=center.z+dir.x*half;spell.radius=half;}
-      if(key==='E'){const length=distance(h,target)||1,dx=(target.x-h.x)/length,dz=(target.z-h.z)/length;this._dash(h,target.x+dx*5,target.z+dz*5,23);h.dashLocks[target.id]=this.time+8;h.dashComboUntil=this.time+.65;this._damage(target,35+rank*20+ap*.6,'magic',h,'E');spell.target=target.id;spell.toX=h.x;spell.toZ=h.z;spell.x=h.x;spell.z=h.z;}
+      if(key==='E'){const length=distance(h,target)||1,dx=(target.x-h.x)/length,dz=(target.z-h.z)/length;this._dash(h,target.x+dx*5,target.z+dz*5,23);h.dashLocks[target.id]=this.time+8;h.dashComboUntil=this.time+.45;this._damage(target,35+rank*20+ap*.6,'magic',h,'E');spell.target=target.id;spell.toX=h.x;spell.toZ=h.z;spell.x=h.x;spell.z=h.z;}
       if(key==='R'){const victims=this._combatEnemies({x:target.x,z:target.z,team:h.team},13,t=>t.kind==='hero'&&t.airborneUntil>this.time);if(!victims.includes(target))victims.push(target);this._dash(h,target.x-2*dir.x,target.z-2*dir.z,62);for(const t of victims){this._airborne(t,1.1);this._damage(t,130+rank*80+h.attack*1.2,'physical',h,'R');}h.flow=100;h.armorPenUntil=this.time+10;spell.target=target.id;spell.x=target.x;spell.z=target.z;spell.toX=h.x;spell.toZ=h.z;spell.radius=13;}
     }else if(h.heroId==='teemo'){
       if(key==='Q')this._tracking(h,target,40+rank*35+ap*.8,'magic','Q').effect='blind';
@@ -257,6 +274,7 @@ export class Game {
     if(!t.alive)return;t.alive=false;t.hp=0;this._event('death',{x:t.x,z:t.z,target:t.id,source:killer?.id,team:t.team,hero:t.heroId,text:t.kind==='hero'?`${t.name} 已阵亡`:t.kind==='tower'?`${t.name} 被摧毁`:t.name||'单位被击败'});
     if(t.kind==='hero'){
       t.deaths++;t.respawnAt=this.time+(this.practice&&t.isPlayer?2:9+t.level*1.6);t.command=t.isPlayer?{type:'stop'}:{type:'ai'};t.recallAt=0;t.lightZone=null;t.spinUntil=0;t.shield=0;
+      if(t.heroId==='yasuo'){t.dashComboUntil=0;t.qStacks=0;t.qStackUntil=0;t.flow=0;t.dashLocks={};t.armorPenUntil=0;}
       let h=killer?.kind==='hero'?killer:null;if(!h){const id=Object.entries(t.contributors||{}).filter(([id,at])=>this.time-at<10&&this.getEntity(Number(id))?.kind==='hero').sort((a,b)=>b[1]-a[1])[0]?.[0];h=this.getEntity(Number(id));}
       if(h&&h.team!==t.team){h.kills++;this.score[h.team]++;this._award(h,300,95);this._excite(h);this._event('message',{text:`${h.name} 击杀了 ${t.name}`,team:h.team});for(const[id,at]of Object.entries(t.contributors||{})){const ally=this.getEntity(Number(id));if(ally?.kind==='hero'&&ally.id!==h.id&&ally.team===h.team&&this.time-at<10){ally.assists++;this._award(ally,100,55);this._excite(ally);}}}t.contributors={};
     }else if(t.kind==='minion'){

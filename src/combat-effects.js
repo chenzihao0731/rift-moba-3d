@@ -18,6 +18,13 @@ export class CombatEffects {
       ['box', new THREE.BoxGeometry(1, 1, 1)],
       ['crystal', new THREE.OctahedronGeometry(1)],
     ]);
+    const thrustGeometry = new THREE.BufferGeometry();
+    thrustGeometry.setAttribute('position', new THREE.Float32BufferAttribute([
+      -.08, 0, 0, -.5, 0, .16, 0, 0, 1, .5, 0, .16, .08, 0, 0,
+    ], 3));
+    thrustGeometry.setIndex([0, 1, 2, 0, 2, 4, 4, 2, 3]);
+    thrustGeometry.computeVertexNormals();
+    this.geometries.set('thrust', thrustGeometry);
     this.positions = new Float32Array(maxParticles * 3);
     this.colors = new Float32Array(maxParticles * 3);
     this.sizes = new Float32Array(maxParticles);
@@ -130,6 +137,66 @@ export class CombatEffects {
     }
     this.add(group, duration, (_, t) => { group.rotation.y = angle - t * Math.PI * 1.4; group.scale.setScalar(.7 + t * .6); });
     this.burst(x, 1.2, z, color, 14, 5, .45);
+  }
+
+  thrust(from, to, color = 0xa2f4e7, width = .8, duration = .32) {
+    const dx = to.x - from.x, dz = to.z - from.z, length = Math.hypot(dx, dz);
+    if (length < .01) return;
+    const group = new THREE.Group();
+    group.name = 'yasuo-q-thrust';
+    group.userData.shape = 'thrust';
+    group.userData.from = { x: from.x, z: from.z };
+    group.userData.to = { x: to.x, z: to.z };
+    group.position.copy(from);
+    group.rotation.y = Math.atan2(dx, dz);
+    for (const [w, tint, opacity] of [[width, color, .48], [width * .3, 0xf1fff8, .95]]) {
+      const blade = this.mesh(group, 'thrust', tint, opacity);
+      blade.scale.set(w, 1, length);
+    }
+    const upright = this.mesh(group, 'thrust', color, .3);
+    upright.rotation.z = Math.PI / 2;
+    upright.scale.set(width * .35, 1, length);
+    this.add(group, duration, (_, t) => {
+      // This trace starts at the sword hand and only extends toward the aimed point.
+      group.scale.z = Math.min(1, .16 + t / .28);
+    });
+    this.lineBurst(from, to, color, 18, .1, duration * .85);
+  }
+
+  swordSpin(x, z, color = 0xa2f4e7, radius = 9, knockup = false) {
+    const group = new THREE.Group();
+    group.name = knockup ? 'yasuo-eq3-spin' : 'yasuo-eq-spin';
+    group.userData.shape = knockup ? 'spin-knockup' : 'spin';
+    group.position.set(x, 1.3, z);
+    for (let i = 0; i < 2; i++) {
+      const arc = this.mesh(group, 'arc', i ? color : 0xeafff5, i ? .45 : .85);
+      arc.rotation.x = -Math.PI / 2;
+      arc.rotation.z = i * Math.PI;
+      arc.scale.setScalar(radius);
+      arc.position.y = i * .18;
+    }
+    const perimeter = this.mesh(group, 'ring', color, .42);
+    perimeter.rotation.x = -Math.PI / 2;
+    perimeter.scale.setScalar(radius);
+    perimeter.position.y = -.9;
+    if (knockup) {
+      for (let i = 0; i < 3; i++) {
+        const wind = this.mesh(group, 'arc', 0xaaf8ff, .35 - i * .07);
+        wind.rotation.x = -Math.PI / 2 + .13;
+        wind.rotation.z = i * Math.PI / 2;
+        wind.scale.setScalar(radius * (1 - i * .17));
+        wind.position.y = .8 + i * 1.2;
+      }
+    }
+    this.add(group, knockup ? .72 : .5, (_, t) => {
+      group.rotation.y = t * Math.PI * 2;
+      group.scale.setScalar(.75 + Math.min(1, t * 4) * .25);
+      if (knockup) group.position.y = 1.3 + t * 1.8;
+    });
+    for (let i = 0; i < (knockup ? 40 : 22); i++) {
+      const angle = i * 2.39996, r = radius * (.78 + Math.random() * .2);
+      this.particle(x + Math.sin(angle) * r, .7, z + Math.cos(angle) * r, color, Math.cos(angle) * 2, knockup ? 4 + Math.random() * 4 : .5, -Math.sin(angle) * 2, .55, knockup ? .75 : .45);
+    }
   }
 
   crystals(x, z, color, radius = 5, duration = .85) {

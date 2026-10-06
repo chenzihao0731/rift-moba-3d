@@ -16,12 +16,14 @@ const scene=new THREE.Scene();scene.background=new THREE.Color(0x101f28);scene.f
 scene.add(new THREE.HemisphereLight(0xc6dfeb,0x284a38,1.6));const sun=new THREE.DirectionalLight(0xffe8c1,2.3);sun.position.set(-65,150,45);sun.castShadow=true;sun.shadow.mapSize.set(2048,2048);Object.assign(sun.shadow.camera,{left:-145,right:145,top:145,bottom:-145,near:1,far:350});sun.shadow.bias=-.0007;sun.shadow.normalBias=.6;scene.add(sun);const moon=new THREE.DirectionalLight(0x75bacf,1);moon.position.set(100,60,-130);scene.add(moon);
 const camera=new THREE.OrthographicCamera(-100,100,100,-100,.1,700),world=createWorld(scene),actors=new Actors(scene,$('labels'));
 let heroId=localStorage.getItem('rift-hero')||'ahri';if(!CHAMPIONS.some(h=>h.id===heroId))heroId='ahri';
+let castMode=localStorage.getItem('rift-cast-mode')==='smart'?'smart':'manual';
 let game=new Game({hero:heroId}),running=false,paused=false,ended=false,locked=true,sound=false,armed=null,selected=null;
 game.setObstacles?.(world.obstacles||[]);
 let zoom=68,width=innerWidth,height=innerHeight,mouse={x:width/2,y:height/2,inside:false},targetPoint={x:0,z:0};const cameraCenter=new THREE.Vector3(0,0,0),ray=new THREE.Raycaster(),ndc=new THREE.Vector2(),plane=new THREE.Plane(new THREE.Vector3(0,1,0),0),rayPoint=new THREE.Vector3();
 let cameraGesture=null,hovered=null;
 const clock=new THREE.Clock();let total=0,hudTime=0,fpsFrames=0,fpsTime=0;const minimap=$('minimap'),mctx=minimap.getContext('2d');
 const aim=new THREE.Group();const aimCircle=new THREE.Mesh(new THREE.RingGeometry(9.8,10,80),new THREE.MeshBasicMaterial({color:0x72eddc,transparent:true,opacity:.55,side:THREE.DoubleSide,depthWrite:false}));aimCircle.rotation.x=-Math.PI/2;aim.add(aimCircle);const aimGeometry=new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(),new THREE.Vector3()]);const aimLine=new THREE.Line(aimGeometry,new THREE.LineBasicMaterial({color:0xa2f5e3,transparent:true,opacity:.9}));aim.add(aimLine);aim.visible=false;scene.add(aim);
+const aimCorridor=new THREE.Mesh(new THREE.BoxGeometry(1,.02,1),new THREE.MeshBasicMaterial({color:0x82ede0,transparent:true,opacity:.18,depthWrite:false}));aimCorridor.visible=false;aim.add(aimCorridor);
 const fogCanvas=document.createElement('canvas');fogCanvas.width=fogCanvas.height=minimap.width;const fogContext=fogCanvas.getContext('2d');
 const selectionRing=new THREE.Mesh(new THREE.RingGeometry(2,2.15,48),new THREE.MeshBasicMaterial({color:0xff756c,transparent:true,opacity:.8,side:THREE.DoubleSide}));selectionRing.rotation.x=-Math.PI/2;selectionRing.visible=false;scene.add(selectionRing);
 const heroStyles={ahri:{heading:'灵动魅惑，游走于战场',description:'用欺诈宝珠消耗对手，以魅惑创造击杀机会。灵魄突袭让你穿梭战场，追击或撤退。',combo:'E 魅惑 → Q 宝珠 → W 狐火 → R 突袭',difficulty:3},ashe:{heading:'精准射击，掌控战场',description:'保持距离，利用万箭齐发减速敌人。鹰击长空照亮野区，魔法水晶箭远程开启团战。',combo:'W 减速 → 普攻叠层 → Q 连射 → R 冰箭',difficulty:2},garen:{heading:'无畏冲锋，守护德玛西亚',description:'贴近敌人释放审判，在危急时刻开启勇气。德玛西亚正义对低生命敌人造成致命打击。',combo:'Q 沉默 → E 审判 → W 减伤 → R 斩杀',difficulty:1},lux:{heading:'以光为刃，照亮黑暗',description:'光之束缚控制对手，透光奇点覆盖战区。曲光屏障保护自己，终极闪光贯穿敌人。',combo:'Q 束缚 → E 奇点 → R 终极闪光',difficulty:2},ezreal:{heading:'奥术探险，灵巧出击',description:'秘术射击持续消耗，精华跃动标记敌人。奥术跃迁躲开危险，精准弹幕穿过整条兵线。',combo:'W 标记 → Q 引爆 → E 位移 → R 弹幕',difficulty:3}};
@@ -38,14 +40,39 @@ function start(){game=new Game({hero:heroId,practice:$('practice-toggle')?.check
 function setPause(v){if(!running||ended)return;cancelCameraGesture();paused=v;show('pause-panel',v);txt('pause-button',v?'继续':'暂停');}
 function openShop(){armed=null;aim.visible=false;cancelCameraGesture();updateCursor();show('shop-panel',$('shop-panel').classList.contains('hidden'));if(!$('shop-panel').classList.contains('hidden'))renderShop();}
 function renderShop(){getShopView().render();}
-function armSkill(key){if(!running||paused||!game.player.alive)return;if(key==='A'||key==='4'){armed=key;updateCursor();toast(key==='A'?'左键点敌人精准攻击，点地面攻击移动':'点击目标位置放置侦查守卫',2200);return;}const instant=CHAMPIONS.find(h=>h.id===heroId).skills.find(s=>s.key===key)?.targeting==='self';if(instant){game.cast(key,targetPoint.x,targetPoint.z,selected?.id);processEvents();return;}if(armed===key){castAt(key,targetPoint.x,targetPoint.z);return;}armed=key;updateCursor();const skill=CHAMPIONS.find(h=>h.id===heroId).skills.find(s=>s.key===key);toast(`${key} ${skill?.name||({D:'闪现',F:'引燃'})[key]} · 点击目标施放，右键取消`,2500);}
+function clearAim(){armed=null;aim.visible=false;updateCursor();}
+function updateCastMode(){
+ document.querySelectorAll('[data-cast-selector]').forEach(select=>{select.value=castMode;});
+ const smart=castMode==='smart',button=$('cast-mode-button');
+ button.querySelector('span').textContent=smart?'智能施法':'手动施法';button.classList.toggle('active',smart);button.setAttribute('aria-pressed',String(smart));
+ button.title=`当前：${smart?'智能施法 · 按键立即朝鼠标施放':'手动施法 · 按键瞄准，左键施放'}。点击切换；Shift+技能临时使用另一种施法。`;
+ button.setAttribute('aria-label',button.title);
+ txt('cast-mode-description',smart?'按 Q W E R 即刻朝鼠标施放技能。':'按 Q W E R 瞄准，左键确认，右键取消。');
+ txt('cast-mode-hint',smart?'智能施法：按键即放 · Shift + 技能手动瞄准':'手动施法：按键瞄准 + 左键 · Shift + 技能立即施放');
+}
+function setCastMode(mode){castMode=mode==='smart'?'smart':'manual';localStorage.setItem('rift-cast-mode',castMode);clearAim();updateCastMode();}
+function armSkill(key){
+ if(!running||paused||ended||!game.player.alive)return;
+ const skill=CHAMPIONS.find(h=>h.id===heroId).skills.find(s=>s.key===key);
+ if(skill?.targeting==='self'){castAt(key,game.player.x,game.player.z);return;}
+ armed=key;updateCursor();
+ const text=key==='A'?'左键点敌人精准攻击，点地面攻击移动':key==='4'?'点击目标位置放置侦查守卫':`${key} ${skill?.name||({D:'闪现',F:'引燃'})[key]} · 左键施放，右键取消`;
+ toast(text,2200);
+}
+function keyboardCast(key,alternate=false){
+ if(!running||paused||ended||!game.player.alive)return;
+ const skill=CHAMPIONS.find(h=>h.id===heroId).skills.find(s=>s.key===key);
+ if(skill?.targeting==='self'){castAt(key,game.player.x,game.player.z);return;}
+ const quick=(castMode==='smart')!==alternate;
+ if(quick)castAtPointer(key);else armSkill(key);
+}
 function castAt(key,x,z,id){
  if(key==='4')game.placeWard(x,z);
  else if(key==='A'){
    const target=game.getEntity(id);
    if(target&&target.team!==game.player.team){selected=target;game.attackMove(x,z,target.id);actors.pulse(target.x,target.z,0xff6f76,2,.45);}
    else{selected=null;game.attackMove(x,z);actors.pulse(x,z,0xffa76f,.7,.5);}
- }else game.cast(key,x,z,id||entityAt(x,z)?.id);
+ }else{const target=game.getEntity(id||entityAt(x,z)?.id),skill=CHAMPIONS.find(h=>h.id===heroId).skills.find(s=>s.key===key);if(skill?.targeting==='direction'&&target?.alive&&target.team!==game.player.team&&game.isVisible(target)){x=target.x;z=target.z;}game.cast(key,x,z,target?.id);}
  armed=null;aim.visible=false;updateCursor();processEvents();
 }
 function castAtPointer(key){const point=pointerPoint(mouse.x,mouse.y),target=entityAtPointer(mouse.x,mouse.y,point);castAt(key,point.x,point.z,target?.id);}
@@ -100,10 +127,10 @@ canvas.addEventListener('pointercancel',cancelCameraGesture);
 canvas.addEventListener('lostpointercapture',()=>{cameraGesture=null;updateCursor();});
 canvas.addEventListener('wheel',e=>{e.preventDefault();if(!running)return;zoom=THREE.MathUtils.clamp(zoom+e.deltaY*.04,35,115);resize();},{passive:false});
 minimap.addEventListener('contextmenu',e=>e.preventDefault());minimap.addEventListener('pointerdown',e=>{if(!running||paused)return;const r=minimap.getBoundingClientRect(),x=(e.clientX-r.left)/r.width*256-128,z=(e.clientY-r.top)/r.height*256-128;if(e.button===2||e.pointerType==='touch'&&armed==='A')game.moveTo(x,z);else{locked=false;cameraCenter.set(x,0,z);updateCameraButton();}});
-const pressed=new Set();window.addEventListener('keydown',e=>{if(e.target.matches('input,textarea'))return;const k=e.key.toUpperCase();const modalOpen=!$('shop-panel').classList.contains('hidden')||!$('help-panel').classList.contains('hidden');if(modalOpen&&k!=='ESCAPE'){if(k==='P'&&!e.repeat&&!$('shop-panel').classList.contains('hidden')){e.preventDefault();openShop();}return;}if(['TAB',' ','ARROWUP','ARROWDOWN','ARROWLEFT','ARROWRIGHT'].includes(k))e.preventDefault();if(e.repeat&&![' ','ARROWUP','ARROWDOWN','ARROWLEFT','ARROWRIGHT'].includes(k))return;pressed.add(k);
+const pressed=new Set();window.addEventListener('keydown',e=>{if(e.target.matches('input,textarea,select'))return;const k=e.code==='Digit4'?'4':e.key.toUpperCase();const modalOpen=!$('shop-panel').classList.contains('hidden')||!$('help-panel').classList.contains('hidden');if(modalOpen&&k!=='ESCAPE'){if(k==='P'&&!e.repeat&&!$('shop-panel').classList.contains('hidden')){e.preventDefault();openShop();}return;}if(['TAB',' ','ARROWUP','ARROWDOWN','ARROWLEFT','ARROWRIGHT'].includes(k))e.preventDefault();if(e.repeat&&![' ','ARROWUP','ARROWDOWN','ARROWLEFT','ARROWRIGHT'].includes(k))return;pressed.add(k);
  if(k==='ESCAPE'){if(armed){armed=null;aim.visible=false;updateCursor();return;}if(!$('help-panel').classList.contains('hidden')){show('help-panel',false);return;}if(!$('shop-panel').classList.contains('hidden')){show('shop-panel',false);return;}setPause(!paused);return;}if(!running||paused||ended)return;
- if('QWER'.includes(k)&&k.length===1){if(e.ctrlKey){e.preventDefault();game.levelSkill?.(k);}else if(e.shiftKey){castAtPointer(k);}else armSkill(k);}
- if(k==='D')castAtPointer('D');if(k==='F')castAtPointer('F');if(k==='4')armSkill('4');if(k==='A'){if(e.shiftKey){const point=pointerPoint(mouse.x,mouse.y);castAt('A',point.x,point.z,entityAtPointer(mouse.x,mouse.y,point)?.id);}else armSkill('A');}if(k==='S'){game.stop();armed=null;}if(k==='B'){game.recall();processEvents();}if(k==='P')openShop();if(k==='Y'){locked=!locked;updateCameraButton();}if(k===' '){cameraCenter.set(game.player.x,0,game.player.z);}
+ if('QWER'.includes(k)&&k.length===1){if(e.ctrlKey){e.preventDefault();game.levelSkill?.(k);}else keyboardCast(k,e.shiftKey);}
+ if(k==='D'||k==='F'||k==='4')keyboardCast(k,e.shiftKey);if(k==='A'){if(e.shiftKey){const point=pointerPoint(mouse.x,mouse.y);castAt('A',point.x,point.z,entityAtPointer(mouse.x,mouse.y,point)?.id);}else armSkill('A');}if(k==='S'){game.stop();armed=null;}if(k==='B'){game.recall();processEvents();}if(k==='P')openShop();if(k==='Y'){locked=!locked;updateCameraButton();}if(k===' '){cameraCenter.set(game.player.x,0,game.player.z);}
  if(k==='TAB'){renderScoreboard();show('scoreboard');}const itemKeys=['1','2','3','5','6','7'];if(itemKeys.includes(k))game.useItem(itemKeys.indexOf(k),targetPoint.x,targetPoint.z);
 });window.addEventListener('keyup',e=>{pressed.delete(e.key.toUpperCase());if(e.key==='Tab')show('scoreboard',false);});window.addEventListener('blur',()=>{pressed.clear();mouse.inside=false;cancelCameraGesture();});
 function updateCameraButton(){txt('camera-button',locked?'跟随':'自由');$('camera-button')?.classList.toggle('active',locked);}
@@ -147,9 +174,20 @@ function frame(){requestAnimationFrame(frame);const rawDt=clock.getDelta(),dt=Ma
  camera.position.copy(cameraCenter).add(new THREE.Vector3(0,110,86));camera.lookAt(cameraCenter);camera.updateMatrixWorld();
  if(running&&mouse.inside&&!cameraGesture){const point=pointerPoint(mouse.x,mouse.y);hovered=entityAtPointer(mouse.x,mouse.y,point);}else hovered=null;updateCursor();
  world.update(total,paused?0:dt);actors.sync(game,paused?0:dt,total,camera,width,height,running);
- aim.visible=running&&!!armed&&!paused;if(aim.visible){aim.position.set(game.player.x,.24,game.player.z);const range=heroId==='yasuo'&&armed==='Q'&&game.player.qStacks>=2&&game.player.qStackUntil>game.time?47:armed==='4'?28:armed==='D'?22:armed==='A'?game.player.attackRange||15:CHAMPIONS.find(h=>h.id===heroId).skills.find(s=>s.key===armed)?.range||35;aimCircle.scale.setScalar(range/10);aimGeometry.attributes.position.setXYZ(1,targetPoint.x-game.player.x,0,targetPoint.z-game.player.z);aimGeometry.attributes.position.needsUpdate=true;aimGeometry.computeBoundingSphere();}
+ aim.visible=running&&!!armed&&!paused;if(aim.visible){
+  const player=game.player,yasuoQ=heroId==='yasuo'&&armed==='Q',combo=yasuoQ&&player.dashComboUntil>game.time;
+  const range=yasuoQ?(combo?9:player.qStacks>=2&&player.qStackUntil>game.time?47:18):armed==='4'?25:armed==='D'?20:armed==='A'?player.attackRange||15:CHAMPIONS.find(h=>h.id===heroId).skills.find(s=>s.key===armed)?.range||35;
+  aim.position.set(player.x,.24,player.z);aimCircle.scale.setScalar(range/10);aimCircle.visible=!yasuoQ||combo;aimLine.visible=!combo;aimCorridor.visible=yasuoQ&&!combo;
+  const point=yasuoQ&&hovered?.alive&&hovered.team!==player.team?hovered:targetPoint;
+  const dx=point.x-player.x,dz=point.z-player.z,d=Math.hypot(dx,dz)||1;
+  const endX=yasuoQ?dx/d*range:dx,endZ=yasuoQ?dz/d*range:dz;
+  aimGeometry.attributes.position.setXYZ(1,endX,0,endZ);aimGeometry.attributes.position.needsUpdate=true;aimGeometry.computeBoundingSphere();
+  if(aimCorridor.visible){aimCorridor.position.set(endX/2,.015,endZ/2);aimCorridor.rotation.y=Math.atan2(endX,endZ);aimCorridor.scale.set(range===47?6:2.5,1,range);}
+ }
  renderer.render(scene,camera);
 }
-populateLobby();resize();show('loading-screen',false);txt('ping','本地对局');requestAnimationFrame(frame);
+document.querySelectorAll('[data-cast-selector]').forEach(select=>select.addEventListener('change',()=>setCastMode(select.value)));
+$('cast-mode-button').addEventListener('click',()=>{setCastMode(castMode==='smart'?'manual':'smart');toast(castMode==='smart'?'智能施法：按键立即朝鼠标施放技能':'手动施法：按键瞄准，左键确认施放',2200);});
+populateLobby();updateCastMode();resize();show('loading-screen',false);txt('ping','本地对局');requestAnimationFrame(frame);
 // A small read-only diagnostics surface supports browser verification and performance review.
-window.__rift={get game(){return game;},get renderer(){return renderer;},get camera(){return camera;},get scene(){return scene;},get actors(){return actors;},get world(){return world;},get running(){return running;},get paused(){return paused;},get armed(){return armed;},get hero(){return heroId;},get cameraLocked(){return locked;},get cameraCenter(){return{x:cameraCenter.x,z:cameraCenter.z};},start,chooseHero,worldToScreen(x,z,y=0){const p=new THREE.Vector3(x,y,z).project(camera);return{x:(p.x*.5+.5)*width,y:(-p.y*.5+.5)*height};}};
+window.__rift={get game(){return game;},get renderer(){return renderer;},get camera(){return camera;},get scene(){return scene;},get actors(){return actors;},get world(){return world;},get running(){return running;},get paused(){return paused;},get armed(){return armed;},get castMode(){return castMode;},get hero(){return heroId;},get cameraLocked(){return locked;},get cameraCenter(){return{x:cameraCenter.x,z:cameraCenter.z};},start,chooseHero,worldToScreen(x,z,y=0){const p=new THREE.Vector3(x,y,z).project(camera);return{x:(p.x*.5+.5)*width,y:(-p.y*.5+.5)*height};}};

@@ -171,3 +171,48 @@ test('normal Teemo only receives mushroom charges when R is learned',()=>{
   assert.equal(game.levelSkill('R'),true);assert.equal(player.shroomCharges,3);
   assert.equal(game.cast('R',player.x+4,player.z),true);
 });
+
+test('Yasuo ordinary Q is a narrow forward thrust and cannot hit enemies beside or behind him',()=>{
+  const{game,player,target}=arena('yasuo');target.x=12;target.z=0;
+  const rear=game._entity({kind:'minion',team:'red',x:-.5,z:0,hp:1000,maxHp:1000,radius:1,stunUntil:10000});
+  const side=game._entity({kind:'minion',team:'red',x:5,z:5,hp:1000,maxHp:1000,radius:1,stunUntil:10000});
+  const nearSide=game._entity({kind:'minion',team:'red',x:0,z:2,hp:1000,maxHp:1000,radius:1,stunUntil:10000});
+  assert.ok(game.cast('Q',30,0));assert.ok(target.hp<target.maxHp);
+  assert.equal(rear.hp,rear.maxHp);assert.equal(side.hp,side.maxHp);assert.equal(nearSide.hp,nearSide.maxHp);
+  const spell=game.events.find(e=>e.type==='spell'&&e.hero==='yasuo'&&e.key==='Q');
+  assert.equal(spell.shape,'thrust');assert.equal(spell.radius,1.25);assert.equal(spell.fromX,player.x);assert.equal(spell.toX,18);assert.equal(spell.toZ,0);
+});
+
+test('Yasuo EQ hits radially at the dash landing and consumes its short combo window once',()=>{
+  const{game,player,target}=arena('yasuo');assert.ok(game.cast('E',target.x,target.z,target.id));
+  const center={x:player.x,z:player.z};
+  const side=game._entity({kind:'minion',team:'red',x:center.x,z:center.z+7,hp:1000,maxHp:1000,radius:1,stunUntil:10000});
+  const rear=game._entity({kind:'minion',team:'red',x:center.x-7,z:center.z,hp:1000,maxHp:1000,radius:1,stunUntil:10000});
+  assert.ok(game.cast('Q',center.x+25,center.z));assert.ok(side.hp<1000);assert.ok(rear.hp<1000);assert.equal(player.dashComboUntil,0);
+  const combo=game.events.find(e=>e.type==='spell'&&e.key==='EQ');assert.equal(combo.shape,'spin');assert.equal(combo.x,center.x);assert.equal(combo.z,center.z);assert.equal(combo.radius,9);
+  const rearHp=rear.hp;player.cooldowns.Q=0;assert.ok(game.cast('Q',center.x+25,center.z));assert.equal(rear.hp,rearHp,'a second Q without another E must be a forward thrust');
+  assert.equal(game.events.filter(e=>e.type==='spell'&&e.key==='EQ').length,1);
+});
+
+test('Yasuo two-stack EQ3 knocks up nearby enemies instead of firing a ranged tornado',()=>{
+  const{game,player,target}=arena('yasuo');assert.ok(game.cast('E',target.x,target.z,target.id));
+  const side=game._entity({kind:'minion',team:'red',x:player.x,z:player.z+7,hp:1000,maxHp:1000,radius:1,stunUntil:10000});
+  const far=game._entity({kind:'minion',team:'red',x:player.x+25,z:player.z,hp:1000,maxHp:1000,radius:1,stunUntil:10000});
+  player.qStacks=2;player.qStackUntil=game.time+7;
+  assert.ok(game.cast('Q',far.x,far.z));assert.equal(game.projectiles.some(p=>p.skill==='Q3'),false);
+  assert.ok(side.airborneUntil>game.time);assert.ok(target.airborneUntil>game.time);assert.equal(far.hp,1000);
+  assert.equal(player.qStacks,0);assert.equal(player.dashComboUntil,0);
+  const event=game.events.find(e=>e.type==='spell'&&e.key==='EQ3');assert.equal(event.shape,'spin-knockup');assert.equal(event.radius,9);
+});
+
+test('Yasuo expired dash combos preserve the normal Q3 projectile and death clears all sword combo state',()=>{
+  const{game,player,target}=arena('yasuo');assert.ok(game.cast('E',target.x,target.z,target.id));
+  const side=game._entity({kind:'minion',team:'red',x:player.x,z:7,hp:1000,maxHp:1000,radius:1,stunUntil:10000});
+  tick(game,.5);assert.ok(game.cast('Q',player.x+25,0));assert.equal(side.hp,1000);
+  assert.equal(game.events.some(e=>e.key==='EQ'),false);
+  player.cooldowns.Q=0;player.qStacks=2;player.qStackUntil=game.time+7;assert.ok(game.cast('Q',player.x+47,0));
+  assert.ok(game.projectiles.some(p=>p.skill==='Q3'));assert.equal(game.events.find(e=>e.key==='Q3').shape,'tornado');
+  player.dashComboUntil=game.time+20;player.qStacks=2;player.qStackUntil=game.time+20;player.flow=100;
+  game._die(player,target);assert.equal(player.dashComboUntil,0);assert.equal(player.qStacks,0);assert.equal(player.qStackUntil,0);assert.equal(player.flow,0);assert.deepEqual(player.dashLocks,{});
+  tick(game,2.1);assert.equal(player.alive,true);assert.equal(player.dashComboUntil,0);assert.equal(player.qStacks,0);
+});

@@ -31,7 +31,7 @@ export const CHAMPIONS = [
   ]},
   {id:'yasuo',name:'亚索',title:'疾风剑豪',role:'战士 · 连招剑客',color:'#a2d9e9',attackRange:6.2,hp:690,mana:0,attack:66,armor:30,speed:14,
     passive:{name:'浪客之道',description:'移动积攒剑意，满层时受到敌方英雄伤害自动获得护盾；装备提供的暴击率翻倍。'},skills:[
-    {key:'Q',name:'斩钢闪',description:'刺剑造成物理伤害。命中两次后，下次变为击飞沿途敌人的龙卷风；踏前斩后施放变为环形斩。',cost:0,cooldown:3.2,range:18,targeting:'direction'},
+    {key:'Q',name:'斩钢闪',description:'向前方窄直线刺剑。命中两次后，下次射出击飞龙卷风；踏前斩结束 0.45 秒内施放改为环形斩，两层时环形击飞。',cost:0,cooldown:3.2,range:18,targeting:'direction'},
     {key:'W',name:'风之障壁',description:'生成持续 4 秒的风墙，拦截敌方普攻飞弹与技能飞弹；防御塔攻击无法被拦截。',cost:0,cooldown:22,range:10,targeting:'direction'},
     {key:'E',name:'踏前斩',description:'穿过射程内目标造成魔法伤害。同一目标 8 秒内无法再次穿越，可连续穿梭不同敌人。',cost:0,cooldown:.65,range:18,targeting:'target'},
     {key:'R',name:'狂风绝息斩',description:'瞬移至被击飞的敌方英雄，延长其滞空并斩击附近所有击飞英雄。必须先击飞目标。',cost:0,cooldown:65,range:62,targeting:'target'},
