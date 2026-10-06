@@ -50,3 +50,11 @@ test('item use preserves other equipment hotkeys and cooldowns remain effective'
   assert.equal(hero.inventory[1].id,'zhonya');
   assert.equal(hero.inventory[2].id,'control-ward');
 });
+
+test('Game quotes and buys an affordable recipe ingredient with accurate purchase feedback, then completes the requested item',()=>{
+  const game=new Game({hero:'kaisa',practice:true}),hero=game.player;hero.gold=1300;
+  const snapshot=JSON.stringify({gold:hero.gold,inventory:hero.inventory}),quote=game.quoteBuy('infinity');assert.equal(quote.ok,true);assert.equal(quote.componentPurchase,true);assert.equal(quote.itemId,'bf-sword');assert.equal(quote.requestedItemId,'infinity');assert.equal(JSON.stringify({gold:hero.gold,inventory:hero.inventory}),snapshot);
+  assert.ok(game.buy('infinity'));assert.equal(hero.gold,0);assert.equal(hero.inventory[0].id,'bf-sword');const event=game.events.findLast(e=>e.type==='purchase');assert.equal(event.amount,1300);assert.equal(event.itemId,'bf-sword');assert.equal(event.requestedItemId,'infinity');assert.equal(event.componentPurchase,true);assert.ok(event.text.includes('暴风大剑')&&event.text.includes('无尽之刃'));
+  hero.gold=2300;assert.ok(game.buy('infinity'));assert.equal(hero.gold,0);assert.equal(hero.inventory[0].id,'infinity');assert.equal(game.events.findLast(e=>e.type==='purchase').componentPurchase,false);
+  hero.x=0;hero.z=0;game.practice=false;hero.gold=10000;const saved=JSON.stringify({gold:hero.gold,inventory:hero.inventory});assert.equal(game.buy('rabadon'),false);assert.equal(JSON.stringify({gold:hero.gold,inventory:hero.inventory}),saved);
+});

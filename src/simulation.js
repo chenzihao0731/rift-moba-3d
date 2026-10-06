@@ -1,9 +1,9 @@
 import { CHAMPIONS } from './champions.js';
 import { ITEMS } from './item-data.js';
-import { purchaseQuote, buyEquipment, sellQuote, sellEquipment } from './shop.js';
+import { smartPurchaseQuote, buySmartEquipment, buyEquipment, sellQuote, sellEquipment } from './shop.js';
 export { CHAMPIONS, ITEMS };
 import { Navigation } from './navigation.js';
-import { isExtended, extendedInit, extendedRecast, extendedValidate, extendedCast, extendedProjectileHit, extendedProjectileEnd, extendedZoneUpdate, cancelExtendedChannel, extendedHeroUpdate, extendedAttackSpeed, extendedMoveSpeed, extendedAttackAmount, extendedAttackHit, extendedAnyAttackHit, extendedDamageAmount, extendedAfterDamage, extendedKill, extendedDeath, extendedSummonUpdate, extendedAI } from './champion-abilities.js';
+import { isExtended, extendedInit, extendedRecast, extendedValidate, extendedCast, extendedProjectileHit, extendedProjectileEnd, extendedZoneUpdate, cancelExtendedChannel, extendedHeroUpdate, extendedAttackSpeed, extendedMoveSpeed, extendedAttackAmount, extendedAttackHit, extendedAnyAttackHit, extendedDamageAmount, extendedAfterDamage, extendedKill, extendedDeath, extendedSummonUpdate, extendedAI, extendedRecompute, extendedCanAct, extendedAttackType, extendedRestrictPosition, extendedLastHit } from './champion-abilities.js';
 import { recomputeEquipmentStats, equipmentOnCast, equipmentOnAttack, equipmentDamage, equipmentStatusUpdate, equipmentUpdate, equipmentHealingMultiplier, useEquipment } from './equipment-effects.js';
 import { SUMMONER_SPELLS, getSummonerSpell, normalizeSummoners, aiSummonerLoadout, castSummoner, cancelSummonerChannel, updateSummoner, resetSummonerState, summonerMoveMultiplier, summonerDamageAmount, absorbSummonerBarrier, updateSummonerAI } from './summoner-spells.js';
 export { SUMMONER_SPELLS, getSummonerSpell, normalizeSummoners };
@@ -37,7 +37,7 @@ export class Game {
     this.summoners=normalizeSummoners(summoners);
     this.time=0;this.winner=null;this.entities=[];this.projectiles=[];this.zones=[];this.reveals=[];this.events=[];this.score={blue:0,red:0};this._id=0;this._wave=0;this._nextWave=5;this._tick=.5;
     this.player=this._hero(CHAMP[heroId]?heroId:'ahri','blue','mid',true);
-    const pools={top:['garen','yasuo','darius','malphite'],mid:['ahri','lux','annie','brand','morgana','veigar','ziggs','fizz'],carry:['ashe','ezreal','jinx','vayne','caitlyn','missfortune'],support:['lux','leona','blitzcrank','sona','morgana'],jungle:['teemo','masteryi','leesin','fizz']};
+    const pools={top:['garen','yasuo','darius','malphite','camille'],mid:['ahri','lux','annie','brand','morgana','veigar','ziggs','fizz','twistedfate'],carry:['ashe','ezreal','jinx','vayne','caitlyn','missfortune','kaisa'],support:['lux','leona','blitzcrank','sona','morgana'],jungle:['teemo','masteryi','leesin','fizz']};
     for(const team of ['blue','red']){
       const selected=new Set(team==='blue'?[this.player.heroId]:[]);
       for(const [role,lane] of [['top','top'],...(team==='red'?[['mid','mid']]:[]),['carry','bot'],['support','bot'],['jungle','jungle']]){
@@ -93,9 +93,9 @@ export class Game {
   _cancelChannels(h){cancelExtendedChannel(this,h);cancelSummonerChannel(this,h);}
   _nearBase(h){return distance(h,BASE[h.team])<20;}
   canShop(h=this.player){return this.practice||!h.alive||this._nearBase(h);}
-  quoteBuy(itemId){return purchaseQuote(this.player,itemId,{canShop:this.canShop()});}
+  quoteBuy(itemId){return smartPurchaseQuote(this.player,itemId,{canShop:this.canShop()});}
   quoteSell(index){return sellQuote(this.player,index,{canShop:this.canShop()});}
-  buy(itemId){const h=this.player,quote=buyEquipment(h,itemId,{canShop:this.canShop()});if(!quote.ok)return this._fail(h,quote.reason);this._recomputeStats(h);this._event('purchase',{source:h.id,text:`已购买 ${quote.item.name}`,amount:quote.cost});return true;}
+  buy(itemId){const h=this.player,quote=buySmartEquipment(h,itemId,{canShop:this.canShop()});if(!quote.ok)return this._fail(h,quote.reason);this._recomputeStats(h);this._event('purchase',{source:h.id,text:quote.componentPurchase?`已购买 ${quote.item.name} · 用于合成 ${quote.requestedItem.name}`:`已购买 ${quote.item.name}`,amount:quote.cost,itemId:quote.itemId,requestedItemId:quote.requestedItemId,componentPurchase:quote.componentPurchase});return true;}
   sell(index){const h=this.player,quote=sellEquipment(h,index,{canShop:this.canShop()});if(!quote.ok)return this._fail(h,quote.reason);this._recomputeStats(h);this._event('sale',{source:h.id,text:`已出售 ${quote.item.name} · 返还 ${quote.refund} 金币`,amount:quote.refund});return true;}
   _fail(h,text){if(h.isPlayer&&(!this._lastFail||this.time-this._lastFail.at>.5||this._lastFail.text!==text)){this._event('message',{text});this._lastFail={text,at:this.time};}return false;}
   levelSkill(key){return this._learn(this.player,String(key).toUpperCase());}
@@ -104,12 +104,12 @@ export class Game {
     if(item.active==='heal'){h.potionUntil=this.time+6;this._consume(h,index);this._event('message',{text:'生命药水：持续恢复生命'});}
     if(item.active==='ward'){if(distance(h,{x,z})>25){this._event('message',{text:'守卫放置距离过远'});return false;}this._addWard(h,x,z,true);this._consume(h,index);}if(!['stasis','heal','ward'].includes(item.active)){const used=useEquipment(this,h,slot,item,x,z);if(used)this._cancelChannels(h);return used;}this._cancelChannels(h);return true;}
   _consume(h,index){const s=h.inventory[index];if(s.count>1)s.count--;else h.inventory[index]=null;}
-  _recomputeStats(h){let stats={hp:0,mana:0,attack:0,armor:0,ap:0,speed:0,haste:0,attackSpeed:0,lifesteal:0,crit:0,critPower:0,manaRegen:0,apMultiplier:0};for(const slot of h.inventory)for(const[k,v]of Object.entries(ITEM[slot?.id]?.stats||{}))stats[k]=(stats[k]||0)+v;h.maxHp=h.baseHp+(h.level-1)*85+stats.hp;h.maxMana=h.baseMana? h.baseMana+(h.level-1)*35+stats.mana:0;h.attack=h.baseAttack+(h.level-1)*4+stats.attack+(h.dragonStacks||0)*6;h.armor=h.baseArmor+(h.level-1)*3.5+stats.armor;h.magicResist=h.baseMagicResist+(h.level-1)*1.5;h.ap=(stats.ap+(h.dragonStacks||0)*10+(h.ext?.veigarAp||0))*(1+stats.apMultiplier);h.speed=h.baseSpeed+Math.min(stats.speed,5);h.attackSpeed=.75*(1+(h.level-1)*.025+stats.attackSpeed);for(const key of ['haste','lifesteal','crit','critPower','manaRegen'])h[key]=stats[key];h.hp=Math.min(h.maxHp,h.hp);h.mana=Math.min(h.maxMana,h.mana);if(h.heroId==='yasuo')h.crit=Math.min(1,h.crit*2);h.attackRange=CHAMP[h.heroId].attackRange+(h.heroId==='jinx'&&h.rocketMode?6+(h.skillLevels.Q||1):0);recomputeEquipmentStats(h,stats,this.time);}
+  _recomputeStats(h){let stats={hp:0,mana:0,attack:0,armor:0,ap:0,speed:0,haste:0,attackSpeed:0,lifesteal:0,crit:0,critPower:0,manaRegen:0,apMultiplier:0};for(const slot of h.inventory)for(const[k,v]of Object.entries(ITEM[slot?.id]?.stats||{}))stats[k]=(stats[k]||0)+v;h.maxHp=h.baseHp+(h.level-1)*85+stats.hp;h.maxMana=h.baseMana? h.baseMana+(h.level-1)*35+stats.mana:0;h.attack=h.baseAttack+(h.level-1)*4+stats.attack+(h.dragonStacks||0)*6;h.armor=h.baseArmor+(h.level-1)*3.5+stats.armor;h.magicResist=h.baseMagicResist+(h.level-1)*1.5;h.ap=(stats.ap+(h.dragonStacks||0)*10+(h.ext?.veigarAp||0))*(1+stats.apMultiplier);h.speed=h.baseSpeed+Math.min(stats.speed,5);h.attackSpeed=.75*(1+(h.level-1)*.025+stats.attackSpeed);for(const key of ['haste','lifesteal','crit','critPower','manaRegen'])h[key]=stats[key];h.hp=Math.min(h.maxHp,h.hp);h.mana=Math.min(h.maxMana,h.mana);if(h.heroId==='yasuo')h.crit=Math.min(1,h.crit*2);h.attackRange=CHAMP[h.heroId].attackRange+(h.heroId==='jinx'&&h.rocketMode?6+(h.skillLevels.Q||1):0);recomputeEquipmentStats(h,stats,this.time);extendedRecompute(this,h,stats);}
   placeWard(x,z){const h=this.player;if(!h.alive||h.cooldowns[4]>0)return false;if(h.wardCharges<=0){this._event('message',{text:'侦查守卫正在充能'});return false;}if(distance(h,{x,z})>25){const d=distance(h,{x,z});x=h.x+(x-h.x)*25/d;z=h.z+(z-h.z)*25/d;}this._cancelChannels(h);h.wardCharges--;h.cooldowns[4]=.8;this._addWard(h,x,z,false);return true;}
   _addWard(h,x,z,control){const wards=this.entities.filter(e=>e.kind==='ward'&&e.sourceId===h.id&&e.alive&&!e.control);if(wards.length>=3)wards[0].alive=false;const e=this._entity({kind:'ward',team:h.team,x:clamp(x,-119,119),z:clamp(z,-119,119),hp:3,maxHp:3,radius:1,sourceId:h.id,control,expiresAt:this.time+(control?150:90),visionRange:control?26:23,name:control?'控制守卫':'侦查守卫'});this._event('ward',{x:e.x,z:e.z,source:h.id,team:h.team,text:control?'控制守卫已部署':'侦查守卫已部署',radius:e.visionRange});}
   isVisible(e,team='blue'){
     if(!e?.alive)return e?.kind==='hero'&&e.team===team;
-    if(e.team===team||isStructure(e)||this.practice)return true;
+    if(e.team===team||isStructure(e)||this.practice)return true;if(e.kind==='hero'&&e.destinySight?.[team]>this.time)return true;
     if(e.kind==='hero'&&e.stealthed&&!this.entities.some(v=>v.alive&&v.team===team&&v.kind==='ward'&&v.control&&distance(v,e)<v.visionRange))return false;
     if(e.kind==='ward'&&!e.control)return this.entities.some(v=>v.alive&&v.team===team&&v.kind==='ward'&&v.control&&distance(v,e)<v.visionRange);
     if(e.revealedUntil>this.time||this.reveals.some(r=>r.team===team&&r.until>this.time&&distance(r,e)<r.radius))return true;
@@ -140,7 +140,7 @@ export class Game {
   _excite(h){if(h?.heroId!=='jinx'||!h.alive)return;h.excitedUntil=this.time+6;this._event('spell',{hero:'jinx',key:'EXCITED',source:h.id,team:h.team,x:h.x,z:h.z,radius:5,color:'#f4a2d4'});}
   cast(key,x=this.player.x,z=this.player.z,targetId){return this._cast(this.player,String(key).toUpperCase(),x,z,targetId);}
   _cast(h,key,x,z,targetId){
-    if(!h.alive)return this._fail(h,'英雄阵亡，等待复活');if(this.winner)return false;if(['D','F'].includes(key))return castSummoner(this,h,key,x,z,targetId);if(h.stunUntil>this.time||h.airborneUntil>this.time||h.invulnerableUntil>this.time)return this._fail(h,'受到控制，暂时无法施放技能');
+    if(!h.alive)return this._fail(h,'英雄阵亡，等待复活');if(this.winner)return false;if(['D','F'].includes(key))return castSummoner(this,h,key,x,z,targetId);if(!extendedCanAct(this,h))return this._fail(h,'极限超载充能中，暂时无法施放英雄技能');if(h.stunUntil>this.time||h.airborneUntil>this.time||h.invulnerableUntil>this.time)return this._fail(h,'受到控制，暂时无法施放技能');
     if(key==='4')return h.isPlayer?this.placeWard(x,z):false;
     if(key==='E'&&h.heroId==='lux'&&h.lightZone){this._cancelChannels(h);this._detonate(h.lightZone);h.lightZone=null;return true;}
     const isRecast=key==='R'&&h.heroId==='ahri'&&h.dashCharges>0&&h.dashUntil>this.time||extendedRecast(this,h,key);
@@ -224,7 +224,7 @@ export class Game {
     }
     equipmentOnCast(this,h,key);this._event('spell',spell);return true;
   }
-  _dash(h,x,z,max){const d=Math.hypot(x-h.x,z-h.z);if(d>.01){const endpoint=P(clamp(h.x+(x-h.x)*Math.min(1,max/d),-119,119),clamp(h.z+(z-h.z)*Math.min(1,max/d),-119,119)),p=this.navigation?this.navigation.nearestPoint(endpoint):endpoint;h.x=p.x;h.z=p.z;}h._route=null;h.facing=Math.atan2(z-h.z,x-h.x);}
+  _dash(h,x,z,max){const d=Math.hypot(x-h.x,z-h.z);if(d>.01){const endpoint=P(clamp(h.x+(x-h.x)*Math.min(1,max/d),-119,119),clamp(h.z+(z-h.z)*Math.min(1,max/d),-119,119)),p=extendedRestrictPosition(this,h,this.navigation?this.navigation.nearestPoint(endpoint):endpoint);h.x=p.x;h.z=p.z;}h._route=null;h.facing=Math.atan2(z-h.z,x-h.x);}
   _shield(e,amount,duration){e.shield=Math.max(e.shield||0,amount);e.shieldUntil=this.time+duration;}
   _projectile(h,dir,data){const p={id:++this._id,sourceId:h.id,team:h.team,hero:h.heroId,x:h.x,z:h.z,dx:dir.x,dz:dir.z,traveled:0,hit:new Set(),age:0,speed:40,range:45,radius:1.5,damage:50,damageType:'magic',...data};this.projectiles.push(p);return p;}
   _tracking(h,t,damage,type,skill='attack'){return this._projectile(h,P(0,0),{targetId:t.id,skill,range:150,speed:55,radius:.6,damage,damageType:type});}
@@ -293,7 +293,7 @@ export class Game {
       let h=killer?.kind==='hero'?killer:null;if(!h){const id=Object.entries(t.contributors||{}).filter(([id,at])=>this.time-at<10&&this.getEntity(Number(id))?.kind==='hero').sort((a,b)=>b[1]-a[1])[0]?.[0];h=this.getEntity(Number(id));}
       if(h&&h.team!==t.team){h.kills++;this.score[h.team]++;this._award(h,300,95);this._excite(h);extendedKill(this,h);this._event('message',{text:`${h.name} 击杀了 ${t.name}`,team:h.team});for(const[id,at]of Object.entries(t.contributors||{})){const ally=this.getEntity(Number(id));if(ally?.kind==='hero'&&ally.id!==h.id&&ally.team===h.team&&this.time-at<10){ally.assists++;this._award(ally,100,55);this._excite(ally);extendedKill(this,ally);}}}t.contributors={};
     }else if(t.kind==='minion'){
-      if(killer?.kind==='hero'){killer.cs++;this._award(killer,t.minionType==='cannon'?60:t.minionType==='super'?80:t.minionType==='melee'?21:14,0);}
+      if(killer?.kind==='hero'){killer.cs++;extendedLastHit(this,killer,t);this._award(killer,t.minionType==='cannon'?60:t.minionType==='super'?80:t.minionType==='melee'?21:14,0);}
       const xp=t.minionType==='melee'?34:t.minionType==='cannon'?60:22;for(const h of this.entities.filter(e=>e.alive&&e.kind==='hero'&&e.team!==t.team&&distance(e,t)<33))this._award(h,0,xp);
     }else if(t.kind==='tower'||t.kind==='inhibitor'){
       if(killer){for(const h of this.entities.filter(e=>e.kind==='hero'&&e.team===killer.team)){this._award(h,t.kind==='tower'?100:35,0);if(h.heroId==='jinx'&&distance(h,t)<45)this._excite(h);}if(killer.kind==='hero')this._award(killer,t.kind==='tower'?150:65,60);}
@@ -335,10 +335,10 @@ export class Game {
       const length=distance(e,target),dx=(target.x-e.x)/(length||1),dz=(target.z-e.z)/(length||1),along=(nexus.x-e.x)*dx+(nexus.z-e.z)*dz;
       if(along>0&&along<Math.min(length,20)&&lineDistance(nexus,e,target)<7.6){const px=-dz,pz=dx,side=(e.x-nexus.x)*px+(e.z-nexus.z)*pz>=0?1:-1;target=P(nexus.x+px*10*side,nexus.z+pz*10*side);stopDistance=.4;break;}
     }
-    const d=distance(e,target);if(d<=stopDistance)return;let speed=(e.speed||10)*extendedMoveSpeed(this,e,target)*summonerMoveMultiplier(this,e);if(e.slowUntil>this.time)speed*=1-(e.slowPower||.3)*(1-(e.slowResist||0));if(e.hasteUntil>this.time)speed*=1.35;if(e.baronEmpowered)speed*=1.15;if(e.excitedUntil>this.time)speed*=1.65;if(e.heroId==='teemo'){if(e.teemoRunUntil>this.time)speed*=1.4;else if(e.skillLevels.W&&this.time-e.lastDamagedAt>5)speed*=1.1+e.skillLevels.W*.015;}const step=Math.min(d-stopDistance,speed*dt),next=P(clamp(e.x+(target.x-e.x)/d*step,-120,120),clamp(e.z+(target.z-e.z)/d*step,-120,120));if(e.kind==='hero'&&this.navigation&&!this.navigation.segmentClear(e,next)){e._route=null;return;}e.x=next.x;e.z=next.z;e.facing=Math.atan2(target.z-e.z,target.x-e.x);e.moving=true;if(e.heroId==='yasuo')e.flow=Math.min(100,(e.flow||0)+step*3.5);
+    const d=distance(e,target);if(d<=stopDistance)return;let speed=(e.speed||10)*extendedMoveSpeed(this,e,target)*summonerMoveMultiplier(this,e);if(e.slowUntil>this.time)speed*=1-(e.slowPower||.3)*(1-(e.slowResist||0));if(e.hasteUntil>this.time)speed*=1.35;if(e.baronEmpowered)speed*=1.15;if(e.excitedUntil>this.time)speed*=1.65;if(e.heroId==='teemo'){if(e.teemoRunUntil>this.time)speed*=1.4;else if(e.skillLevels.W&&this.time-e.lastDamagedAt>5)speed*=1.1+e.skillLevels.W*.015;}const step=Math.min(d-stopDistance,speed*dt),next=extendedRestrictPosition(this,e,P(clamp(e.x+(target.x-e.x)/d*step,-120,120),clamp(e.z+(target.z-e.z)/d*step,-120,120)));if(e.kind==='hero'&&this.navigation&&!this.navigation.segmentClear(e,next)){e._route=null;return;}e.x=next.x;e.z=next.z;e.facing=Math.atan2(target.z-e.z,target.x-e.x);e.moving=true;if(e.heroId==='yasuo')e.flow=Math.min(100,(e.flow||0)+step*3.5);
   }
   _attack(e,t){
-    if(!t?.alive||t.invulnerableUntil>this.time||e.attackCooldown>0||e.stunUntil>this.time||e.airborneUntil>this.time||e.invulnerableUntil>this.time||distance(e,t)>e.attackRange+t.radius)return false;
+    if(!t?.alive||!extendedCanAct(this,e)||t.invulnerableUntil>this.time||e.attackCooldown>0||e.stunUntil>this.time||e.airborneUntil>this.time||e.invulnerableUntil>this.time||distance(e,t)>e.attackRange+t.radius)return false;
     if(['hero','minion','tower'].includes(e.kind)&&!this.isVisible(t,e.team))return false;
     if(isStructure(t)&&!this._canHitStructure(t,e))return false;
     let speed=e.kind==='hero'?e.attackSpeed:e.kind==='tower'?.8:e.kind==='monster'?.7:.85;
@@ -352,7 +352,7 @@ export class Game {
     this._breakStealth(e);this._event('attack',{source:e.id,target:t.id,hero:e.heroId,team:e.team,key:'attack',rocket:e.heroId==='jinx'&&e.rocketMode,x:t.x,z:t.z,fromX:e.x,fromZ:e.z,toX:t.x,toZ:t.z,color:critical?'#ffc763':e.team==='blue'?'#55ceea':'#fc6978'});
     if(e.attackRange>8){const p=this._tracking(e,t,amount,'physical');p.blindMiss=e.blindUntil>this.time;if(e.heroId==='jinx'&&e.rocketMode){p.rocket=true;p.radius=1;p.speed=42;}}
     else if(e.blindUntil>this.time){if(e.isPlayer)this._event('message',{text:'致盲中 · 普通攻击未命中'});}
-    else{this._damage(t,amount,'physical',this.getEntity(e.summonOwner)||e,'attack');this._triggerMark(e,t);this._onAttackHit(e,t,amount);}
+    else{this._damage(t,amount,extendedAttackType(this,e),this.getEntity(e.summonOwner)||e,'attack');this._triggerMark(e,t);this._onAttackHit(e,t,amount);}
     if(e.redBuffUntil>this.time&&t.kind==='hero'){if(!this._controlImmune(t)){t.slowUntil=this.time+2;t.slowPower=.3;}this._damage(t,10+e.level*2,'true',e,'red-buff');}
     return true;
   }
@@ -398,7 +398,7 @@ export class Game {
     if(h.retreatUntil>this.time||health<.35&&this._nearBase(h)){this._walk(h,BASE[h.team],dt,4);if(this._nearBase(h))h.retreatUntil=0;return;}
     if(health<.42&&this.time-h.lastDamagedAt>6&&!this._nearBase(h)){h.recallAt=this.time+6;h.command={type:'ai'};this._event('recall',{x:h.x,z:h.z,source:h.id,team:h.team});return;}
     if(this.time>(h.aiWardNext||45)&&Math.abs(h.x+h.z)<55&&!this._nearBase(h)&&h.wardCharges>0){h.aiWardNext=this.time+65;h.wardCharges--;this._addWard(h,h.x+4,h.z-4,false);}
-    if(this._nearBase(h)&&h.gold>1200&&h.inventory.some(s=>!s)){const mage=['ahri','lux','teemo','annie','brand','morgana','veigar','ziggs','fizz','sona'].includes(h.heroId);let item=!h.inventory.some(Boolean)?(mage?'doran-ring':'doran-blade'):mage&&!h.inventory.some(s=>s?.id==='ludens')?'ludens':!h.inventory.some(s=>s?.id==='blade-ruined')?'blade-ruined':null;if(item&&buyEquipment(h,item,{canShop:true}).ok)this._recomputeStats(h);}
+    if(this._nearBase(h)&&h.gold>1200&&h.inventory.some(s=>!s)){const mage=['ahri','lux','teemo','annie','brand','morgana','veigar','ziggs','fizz','sona','twistedfate'].includes(h.heroId);let item=!h.inventory.some(Boolean)?(mage?'doran-ring':'doran-blade'):mage&&!h.inventory.some(s=>s?.id==='ludens')?'ludens':!h.inventory.some(s=>s?.id==='blade-ruined')?'blade-ruined':null;if(item&&buyEquipment(h,item,{canShop:true}).ok)this._recomputeStats(h);}
     let target=this.getEntity(h.aiTargetId);if(target&&!this.isVisible(target,h.team))target=null;
     if(h.aiThink<=0||!target?.alive){h.aiThink=.3+Math.random()*.2;target=this._nearest(h,36,e=>e.kind!=='nexus'||this._canHitStructure(e,h),h.lane==='jungle');h.aiTargetId=target?.id||0;}
     if(target?.alive){

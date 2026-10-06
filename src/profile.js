@@ -1,6 +1,6 @@
 export const PROFILE_KEY = 'rift-collection-v1';
 export const FREE_HEROES = ['ahri', 'ashe', 'garen'];
-const prices = {lux:1350,ezreal:2500,yasuo:3200,teemo:1350,jinx:2500,annie:450,brand:1350,morgana:1350,veigar:1350,ziggs:2500,fizz:3200,masteryi:450,leesin:3200,darius:2500,malphite:450,blitzcrank:1350,leona:1350,vayne:3200,caitlyn:2500,missfortune:1350,sona:1350};
+const prices = {lux:1350,ezreal:2500,yasuo:3200,teemo:1350,jinx:2500,annie:450,brand:1350,morgana:1350,veigar:1350,ziggs:2500,fizz:3200,masteryi:450,leesin:3200,darius:2500,malphite:450,blitzcrank:1350,leona:1350,vayne:3200,caitlyn:2500,missfortune:1350,sona:1350,twistedfate:1350,kaisa:3200,camille:3200};
 export const heroPrice = id => FREE_HEROES.includes(id) ? 0 : prices[id] ?? 2500;
 const amount = value => Number.isSafeInteger(value) && value >= 0 ? Math.min(value, 9999999) : 0;
 const uniqueStrings = value => Array.isArray(value) ? [...new Set(value.filter(v=>typeof v==='string'&&v.length<80))] : [];

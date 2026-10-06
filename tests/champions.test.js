@@ -11,7 +11,7 @@ function arena(hero){
 }
 
 test('all champions publish complete aim metadata and new passives',()=>{
-  assert.equal(CHAMPIONS.length,24);
+  assert.equal(CHAMPIONS.length,27);
   for(const id of ['yasuo','teemo','jinx']){
     const champion=CHAMPIONS.find(c=>c.id===id);assert.ok(champion.passive?.description);
     assert.deepEqual(champion.skills.map(s=>s.key),['Q','W','E','R']);

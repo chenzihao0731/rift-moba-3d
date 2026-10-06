@@ -3,7 +3,7 @@ import * as THREE from 'three';
 const faceMaterials=new Map();
 function faceMaterial(color){if(!faceMaterials.has(color))faceMaterials.set(color,new THREE.MeshStandardMaterial({color,roughness:.65,metalness:0}));return faceMaterials.get(color);}
 function fixedPart(group,geometry,color,x,y,z,scale){const material=faceMaterial(color),mesh=new THREE.Mesh(geometry,material);mesh.position.set(x,y,z);mesh.scale.set(...scale);mesh.castShadow=true;mesh.receiveShadow=true;mesh.userData.skinProtected=true;mesh.userData.originalFaceMaterial=material;group.add(mesh);return mesh;}
-const HAIR={ahri:0x172338,ashe:0xdcebf4,garen:0x403628,lux:0xeacf70,ezreal:0xdabc58,yasuo:0x202935,jinx:0x229de0,annie:0xb83a58,morgana:0x23223a,masteryi:0x334f49,darius:0x2c2631,leona:0xbb7650,vayne:0x272035,caitlyn:0x392840,missfortune:0xad393b,sona:0x45b4c7};
+const HAIR={ahri:0x172338,ashe:0xdcebf4,garen:0x403628,lux:0xeacf70,ezreal:0xdabc58,yasuo:0x202935,jinx:0x229de0,annie:0xb83a58,morgana:0x23223a,masteryi:0x334f49,darius:0x2c2631,leona:0xbb7650,vayne:0x272035,caitlyn:0x392840,missfortune:0xad393b,sona:0x45b4c7,twistedfate:0x312537,kaisa:0x282139,camille:0xc2d7d5};
 const CLOTH={ahri:0xb9234b,ashe:0x235c97,garen:0x244c8b,lux:0xe7d1a0,ezreal:0x916139,yasuo:0x345967,jinx:0x6a325f,annie:0x833450,brand:0x49302a,morgana:0x45234c,veigar:0x473b7b,ziggs:0x896843,fizz:0x319395,masteryi:0x418171,leesin:0xb33535,darius:0x4b4149,malphite:0x6f7461,blitzcrank:0xc19847,leona:0x9f7543,vayne:0x46234f,caitlyn:0x493a72,missfortune:0x4d2635,sona:0x347f91,teemo:0x56724a};
 const GOLD=0xcab784,STEEL=0xbecbd0,DARK=0x29343e;
 
@@ -26,7 +26,7 @@ export function curvedTail(kit,index){
  return kit.geo(`fox-curved-tail:${index}`,()=>taperedTube(points,[.18,.36,.52,.43,.015],24,10));
 }
 export function addHeroDetail(group,e,kit){
- const {sphere,box,cylinder,ring,rod,part,geo}=kit,body=group.userData.body,id=e.heroId,small=['annie','veigar','ziggs'].includes(id),human=!['malphite','blitzcrank','veigar','teemo','fizz','ziggs','brand'].includes(id),h=['ahri','ashe','garen','lux','ezreal','yasuo','jinx'].includes(id)?3.42:small?2.6:id==='fizz'?3:id==='teemo'?2.4:3.6,cloth=CLOTH[id],hair=HAIR[id]||DARK;
+ const {sphere,box,cylinder,ring,rod,part,geo}=kit,body=group.userData.body,id=e.heroId,small=['annie','veigar','ziggs'].includes(id),human=!['malphite','blitzcrank','veigar','teemo','fizz','ziggs','brand'].includes(id),h=group.userData.detailHeadHeight??(['ahri','ashe','garen','lux','ezreal','yasuo','jinx'].includes(id)?3.42:small?2.6:id==='fizz'?3:id==='teemo'?2.4:3.6),cloth=CLOTH[id]??({twistedfate:0x443454,kaisa:0x38264f,camille:0x246870}[id]),hair=HAIR[id]||DARK;
  const eyeGeometry=geo('detail-eye',()=>new THREE.SphereGeometry(1,12,8)),featureGeometry=geo('detail-feature',()=>new THREE.SphereGeometry(1,10,7));
  const fixed=(g,c,x,y,z,s)=>fixedPart(g,featureGeometry,c,x,y,z,s);
  const tube=(key,c,points,r=.04)=>part(body,geo(`detail-tube:${id}:${key}`,()=>new THREE.TubeGeometry(new THREE.CatmullRomCurve3(points.map(p=>new THREE.Vector3(...p))),Math.max(8,points.length*4),r,6,false)),c);
@@ -45,8 +45,8 @@ export function addHeroDetail(group,e,kit){
    sphere(body,0xf4c9af,side*.525,h-.04,0,[.11,.18,.12]);
   }
   sphere(body,0xf4c9af,0,h-.095,.566,[.074,.137,.094]);fixed(body,0x452b31,0,h-.315,.494,[.116,.018,.015]);fixed(body,0xae665f,0,h-.285,.51,[.13,.029,.025]);
-  sphere(body,0xf4c9af,0,h-.47,.32,[.28,.15,.2]);
-  if(!['leesin','caitlyn','missfortune'].includes(id))for(let i=-3;i<=3;i++){
+  sphere(body,0xf4c9af,0,h-.47,.32,['twistedfate','kaisa','camille'].includes(id)?[.2,.075,.1]:[.28,.15,.2]);
+  if(!['leesin','caitlyn','missfortune','twistedfate'].includes(id))for(let i=-3;i<=3;i++){
    const lock=part(body,geo('detail-hair-lock',()=>new THREE.ConeGeometry(.12,.63,6)),hair,i*.13,h+.23-Math.abs(i)*.025,.31,[1,1,.56]);lock.rotation.z=i*.13;lock.rotation.x=.25;
   }
  }
@@ -61,7 +61,7 @@ export function addHeroDetail(group,e,kit){
   }
  }
  // Neck/collar, belt stitchwork, overlapping lower garment panels and boot soles.
- if(!['malphite','blitzcrank','veigar','fizz','brand','teemo'].includes(id)){
+ if(!['malphite','blitzcrank','veigar','fizz','brand','teemo','twistedfate','kaisa','camille'].includes(id)){
   const sy=small?.73:1;
   const collarColor=['garen','darius','leona'].includes(id)?GOLD:id==='ahri'?0xf0ddd2:id==='ashe'?0xb5cfda:cloth;
   for(const side of[-1,1]){
@@ -76,7 +76,10 @@ export function addHeroDetail(group,e,kit){
    for(let i=0;i<3;i++)rod(leg,0xcab784,[-.14,small?-.53+i*.08:-1.08+i*.1,.59],[.14,small?-.53+i*.08:-1.08+i*.1,.59],.018);
   }
  }
- if(id==='ahri'){
+ if(id==='twistedfate'){
+  for(const side of[-1,1]){const moustache=fixed(body,0x312537,side*.075,h-.239,.545,[.1,.019,.018]);moustache.rotation.z=side*.13;}
+  fixed(body,0x312537,0,h-.38,.434,[.08,.066,.05]);
+ }else if(id==='ahri'){
   for(const side of[-1,1]){const inner=part(body,geo('detail-fox-ear',()=>new THREE.ConeGeometry(.13,.57,4)),0xc48196,side*.42,4.25,.07,[1,1,.4]);inner.rotation.z=-side*.22;for(let i=0;i<3;i++)trim(`whisker${side}:${i}`,[[side*.32,h-.14+i*.068,.548],[side*.45,h-.18+i*.076,.415]],.012,0x29202b);}
   plate('corset',0x9d173d,[[-.48,.45],[.48,.45],[.36,-.45],[-.36,-.45]],0,2.28,.73);
   for(let i=0;i<4;i++){rod(body,GOLD,[-.16,2.05+i*.17,.88],[.16,2.22+i*.17,.88],.018);rod(body,GOLD,[.16,2.05+i*.17,.88],[-.16,2.22+i*.17,.88],.018);}

@@ -12,7 +12,7 @@ const slow=(g,t,power,seconds)=>{if(!immune(g,t)){t.slowUntil=g.time+seconds;t.s
 const immune=(g,t)=>t.blackShieldUntil>g.time&&t.shield>0;
 const emit=(g,h,key,shape,data={})=>g._event('spell',{source:h.id,hero:h.heroId,key,shape,team:h.team,color:DATA[h.heroId]?.color,x:h.x,z:h.z,fromX:h.x,fromZ:h.z,toX:h.x,toZ:h.z,...data});
 function zone(g,h,kind,key,x,z,radius,duration,extra={}){return g._zone('extended',h,{kind,key,x,z,radius,color:DATA[h.heroId]?.color,until:g.time+duration,nextTick:g.time,tickEvery:.5,...extra});}
-function relocate(g,e,x,z){const p=g.navigation?g.navigation.nearestPoint(P(clamp(x,-119,119),clamp(z,-119,119))):P(clamp(x,-119,119),clamp(z,-119,119));e.x=p.x;e.z=p.z;e._route=null;}
+function relocate(g,e,x,z){const raw=g.navigation?g.navigation.nearestPoint(P(clamp(x,-119,119),clamp(z,-119,119))):P(clamp(x,-119,119),clamp(z,-119,119)),p=extendedRestrictPosition(g,e,raw);e.x=p.x;e.z=p.z;e._route=null;}
 function push(g,t,h,distance){const length=dist(h,t),direction=length>.01?P((t.x-h.x)/length,(t.z-h.z)/length):h.direction||P(Math.cos(h.facing||0),Math.sin(h.facing||0));relocate(g,t,t.x+direction.x*distance,t.z+direction.z*distance);}
 function pull(g,t,h,distance=5){const length=dist(h,t)||1;relocate(g,t,h.x+(t.x-h.x)/length*distance,h.z+(t.z-h.z)/length*distance);}
 function coneTargets(g,h,dir,range,angle=.7){return foes(g,h,range).filter(t=>{const dx=t.x-h.x,dz=t.z-h.z,d=Math.hypot(dx,dz)||1;return(dx*dir.x+dz*dir.z)/d>Math.cos(angle);});}
@@ -25,8 +25,28 @@ function hit(g,h,t,amount,key,type='magic'){
 }
 function heal(g,h,amount){h.hp=Math.min(h.maxHp,h.hp+amount*equipmentHealingMultiplier(h,g.time));}
 export const isExtended=id=>EXTENDED_IDS.has(id);
-export function extendedInit(h){if(!isExtended(h.heroId))return;h.ext={casts:0,attacks:0,annieStacks:0,veigarAp:0,shortFuseAt:0,silver:{},brand:{},hemorrhage:{},manaBarrierAt:0,headshot:0,trapHeadshots:{},channel:null};}
-export function extendedRecast(g,h,key){return h.heroId==='leesin'&&key==='Q'&&h.sonicMarkUntil>g.time&&g.getEntity(h.sonicMarkId)?.alive||h.heroId==='ziggs'&&key==='W'&&h.satchel&&!h.satchel.dead;}
+export function extendedInit(h){if(!isExtended(h.heroId))return;h.ext={casts:0,attacks:0,annieStacks:0,veigarAp:0,shortFuseAt:0,silver:{},brand:{},hemorrhage:{},manaBarrierAt:0,headshot:0,trapHeadshots:{},channel:null,cardCycle:null,cardChoice:'blue',lockedCard:null,cardUntil:0,stackedDeck:0,destinyUntil:0,gateReady:false,evolutions:{Q:false,W:false,E:false},evolutionStats:{attack:0,ap:0,attackSpeed:0},camilleQStage:0,camilleQReadyAt:0,camilleQUntil:0,camilleQArmed:0,hookUntil:0,hookAnchor:null};}
+export function extendedRecast(g,h,key){const ext=h.ext||{};return !!(h.heroId==='leesin'&&key==='Q'&&h.sonicMarkUntil>g.time&&g.getEntity(h.sonicMarkId)?.alive||h.heroId==='ziggs'&&key==='W'&&h.satchel&&!h.satchel.dead||h.heroId==='twistedfate'&&(key==='W'&&ext.cardCycle?.until>g.time||key==='R'&&ext.gateReady&&ext.destinyUntil>g.time)||h.heroId==='camille'&&(key==='Q'&&ext.camilleQStage===1&&!ext.camilleQArmed&&ext.camilleQUntil>g.time||key==='E'&&ext.hookUntil>g.time));}
+
+const cardChoice=(g,h)=>['blue','red','gold'][Math.floor((g.time-h.ext.cardCycle.startedAt)/.55+1e-8)%3];
+function hookTerrain(g,h,x,z,range=30){
+  const length=Math.hypot(x-h.x,z-h.z);if(length<.01)return null;const dx=(x-h.x)/length,dz=(z-h.z)/length;
+  let nearest=null,best=range+.001;
+  for(const o of g.navigation?.obstacles||[]){
+    const vx=h.x-o.x,vz=h.z-o.z,b=vx*dx+vz*dz,c=vx*vx+vz*vz-o.r*o.r,discriminant=b*b-c;
+    if(discriminant<0||c<-.1)continue;const d=-b-Math.sqrt(discriminant);
+    if(d>=0&&d<=range&&d<best){best=d;nearest=P(h.x+dx*Math.max(0,d-.25),h.z+dz*Math.max(0,d-.25));}
+  }
+  for(const [coordinate,direction]of [[h.x,dx],[h.z,dz]])if(Math.abs(direction)>.001){const edge=(direction>0?119:-119),d=(edge-coordinate)/direction;if(d>=0&&d<=range&&d<best){best=d;nearest=P(clamp(h.x+dx*Math.max(0,d-.25),-119,119),clamp(h.z+dz*Math.max(0,d-.25),-119,119));}}
+  return nearest;
+}
+export function extendedRecompute(g,h,stats){
+  if(h.heroId!=='kaisa')return;
+  h.ext.evolutionStats={attack:stats.attack||0,ap:stats.ap||0,attackSpeed:stats.attackSpeed||0};
+  const next={Q:(stats.attack||0)>=100,W:(stats.ap||0)>=100,E:(stats.attackSpeed||0)>=1};
+  for(const key of ['Q','W','E'])if(next[key]&&!h.ext.evolutions[key])emit(g,h,`${key}_EVOLVE`,'shield',{radius:5});h.ext.evolutions=next;
+}
+export function extendedCanAct(g,h){return !(h.heroId==='kaisa'&&h.kaisaEUntil>g.time);}
 
 // Validation runs before resources or cooldowns change; directional and ground casts
 // remain valid without an enemy, while targeted spells require current vision.
@@ -34,19 +54,27 @@ export function extendedValidate(g,h,key,x,z,targetId){
   if(!isExtended(h.heroId))return null;
   const skill=DATA[h.heroId].skills.find(s=>s.key===key),recast=extendedRecast(g,h,key);
   if(skill.passive)return{error:`${skill.name}是被动技能：普通攻击自动触发`};
+  if(!Number.isFinite(x)||!Number.isFinite(z))return{error:'请选择有效的技能位置'};
+  const movementSpell=h.heroId==='camille'&&['E','R'].includes(key)||h.heroId==='kaisa'&&key==='R'||h.heroId==='twistedfate'&&key==='R'&&recast;
+  if(movementSpell&&['rootUntil','charmUntil','fearUntil','tauntUntil'].some(status=>h[status]>g.time))return{error:'受到控制，无法使用此位移技能'};
+  let hookAnchor;
+  if(h.heroId==='camille'&&key==='Q'&&h.ext.camilleQArmed)return{error:'请先用普通攻击打出精准礼仪'};
+  if(h.heroId==='camille'&&key==='E'&&!recast){hookAnchor=hookTerrain(g,h,x,z);if(!hookAnchor)return{error:'钩索需要射程内实际地形，请瞄准墙壁或地图边缘'};}
+  if(h.heroId==='twistedfate'&&key==='R'&&recast&&(dist(h,{x,z})>skill.range||Math.abs(x)>119||Math.abs(z)>119))return{error:'传送位置需要位于地图内且距离不超过 150'};
   let target=g.getEntity(targetId);
   if(h.heroId==='leesin'&&key==='Q'&&recast){target=g.getEntity(h.sonicMarkId);if(!target?.alive||!g.isVisible(target,h.team)||dist(h,target)>65)return{error:'回音击需要可见的音波标记目标'};}
   else if(skill.targeting==='target'){
     if(targetId&&(!target?.alive||target.team===h.team||structure(target)||target.kind==='ward'||target.invulnerableUntil>g.time||!g.isVisible(target,h.team)))return{error:'此技能需要可见的敌方单位'};
     target??=g._nearest({x,z,team:h.team},12,t=>!structure(t)&&t.kind!=='ward',true);
-    const heroOnly=(['darius','leesin','veigar','caitlyn'].includes(h.heroId)&&key==='R');
+    const heroOnly=(['darius','leesin','veigar','caitlyn','kaisa','camille'].includes(h.heroId)&&key==='R');
     if(!target?.alive||target.team===h.team||structure(target)||target.invulnerableUntil>g.time||heroOnly&&target.kind!=='hero'||!g.isVisible(target,h.team)||dist(h,target)>skill.range+target.radius)return{error:heroOnly?'此技能需要射程内可见的敌方英雄':'此技能需要射程内可见的敌人'};
   }else if(skill.targeting==='ally'){
     if(targetId&&target?.team!==h.team&&h.heroId!=='leesin')return{error:'此技能只能对自己或友军施放'};
     target=target?.alive&&target.team===h.team&&target.kind==='hero'?target:h;
     if(dist(h,target)>skill.range)return{error:'友军距离过远'};
   }
-  return{target,recast,cost:recast?0:skill.cost};
+  if(h.heroId==='kaisa'&&key==='R'&&!(target?.kaisaPlasma?.[h.id]?.until>g.time&&target.kaisaPlasma[h.id].stacks>0))return{error:'猎手本能需要带有自身电浆的可见敌方英雄'};
+  return{target,recast,hookAnchor,cost:recast?0:skill.cost};
 }
 
 export function extendedCast(g,h,key,x,z,context,spell){
@@ -165,6 +193,52 @@ export function extendedCast(g,h,key,x,z,context,spell){
       if(key==='E'){for(const a of allies(g,h,25))a.hasteUntil=g.time+3;spell.shape='circle';spell.x=h.x;spell.z=h.z;spell.radius=25;zone(g,h,'sona-aura','E',h.x,h.z,25,3,{follow:true});}
       if(key==='R')bolt({pierce:true,radius:4,damage:120+rank*70+h.ap*.7});
       if(key!=='R'){h.ext.casts=(h.ext.casts||0)+1;if(h.ext.casts>=3){h.ext.casts=0;h.powerChordReady=true;}}break;
+    case 'twistedfate':
+      if(key==='Q'){
+        const angle=Math.atan2(dir.z,dir.x);for(const offset of [-.23,0,.23])projectile(g,h,P(Math.cos(angle+offset),Math.sin(angle+offset)),'Q',range,magic(h,rank,40,.65),{pierce:true,radius:1.8,shape:'card'});
+        spell.shape='cone';spell.radius=range;spell.toX=h.x+dir.x*range;spell.toZ=h.z+dir.z*range;
+      }
+      if(key==='W'){
+        spell.x=h.x;spell.z=h.z;spell.shape='shield';spell.radius=4;
+        if(context.recast){const card=cardChoice(g,h);h.ext.lockedCard=card;h.ext.cardChoice=card;h.ext.cardUntil=g.time+6;h.ext.cardCycle=null;spell.key=`W_${card.toUpperCase()}`;spell.card=card;}
+        else{h.ext.cardCycle={startedAt:g.time,until:g.time+6};h.ext.cardChoice='blue';h.ext.lockedCard=null;}
+      }
+      if(key==='R'){
+        if(context.recast){h.ext.gateReady=false;h.ext.channel={type:'gate',until:g.time+1.5,x:spot.x,z:spot.z};h.command=h.isPlayer?{type:'stop'}:{type:'ai'};spell.key='R2_GATE';spell.shape='channel';spell.duration=1.5;}
+        else{h.ext.destinyUntil=g.time+6;h.ext.gateReady=true;for(const enemy of g.entities.filter(t=>t.alive&&t.kind==='hero'&&t.team!==h.team)){enemy.destinySight??={};enemy.destinySight[h.team]=g.time+6;}spell.key='DESTINY';spell.shape='circle';spell.radius=200;spell.x=h.x;spell.z=h.z;}
+      }
+      break;
+    case 'kaisa':
+      if(key==='Q'){
+        const victims=foes(g,h,range).filter(t=>g.isVisible(t,h.team)).sort((a,b)=>dist(a,h)-dist(b,h)),counts=new Map(),missiles=h.ext.evolutions.Q?12:6;
+        for(let i=0;i<missiles&&victims.length;i++){const victim=victims[i%victims.length],count=counts.get(victim.id)||0;counts.set(victim.id,count+1);const amount=(16+rank*9+h.attack*.4+h.ap*.2)*(count? .25:1),p=g._tracking(h,victim,amount,'physical','Q');Object.assign(p,{effect:'ext:kaisa:Q',speed:48+i*2,radius:.45});}
+        spell.x=h.x;spell.z=h.z;spell.radius=range;spell.missiles=missiles;spell.shape='circle';
+      }
+      if(key==='W')bolt({damage:35+rank*30+h.attack*.9+h.ap*.6,radius:2.1,speed:60});
+      if(key==='E'){
+        h.kaisaEUntil=g.time+.8;h.kaisaAttackUntil=0;h.stealthed=!!h.ext.evolutions.E;spell.shape='channel';spell.x=h.x;spell.z=h.z;spell.radius=5;spell.duration=.8;
+      }
+      if(key==='R'){
+        const toward=dist(h,target)||1;dashTo(target.x-(target.x-h.x)/toward*6,target.z-(target.z-h.z)/toward*6,range);g._shield(h,90+rank*70+h.attack*.9+h.ap*.75,2);spell.target=target.id;spell.radius=6;
+      }
+      break;
+    case 'camille':
+      if(key==='Q'){
+        h.ext.camilleQArmed=context.recast?2:1;if(!context.recast){h.ext.camilleQStage=0;h.ext.camilleQUntil=g.time+6;}spell.key=context.recast?'Q2':'Q';spell.shape='shield';spell.x=h.x;spell.z=h.z;spell.radius=4;h.attackCooldown=0;
+      }
+      if(key==='W'){
+        spell.shape='cone';spell.radius=range;spell.toX=h.x+dir.x*range;spell.toZ=h.z+dir.z*range;
+        let recovered=0;for(const t of coneTargets(g,h,dir,range,.75)){const outer=dist(h,t)>=12,amount=35+rank*20+h.attack*.5+(outer?t.maxHp*(.025+rank*.008):0),actual=hit(g,h,t,amount,'W','physical');if(outer){slow(g,t,.65,2);if(t.kind==='hero')recovered+=actual*.6;}}heal(g,h,recovered);
+      }
+      if(key==='E'){
+        if(context.recast){h.ext.hookUntil=0;h.ext.hookAnchor=null;const origin=P(h.x,h.z),victim=lineTargets(g,h,dir,range,2.5).filter(t=>t.kind==='hero'&&g.isVisible(t,h.team)).sort((a,b)=>dist(a,origin)-dist(b,origin))[0];dashTo(victim?victim.x-dir.x*2:spot.x,victim?victim.z-dir.z*2:spot.z,range);if(victim){hit(g,h,victim,30+rank*25+h.attack*.65,'E','physical');stun(g,victim,1);h.camilleAttackUntil=g.time+4;}spell.key='E2';}
+        else{dashTo(context.hookAnchor.x,context.hookAnchor.z,range);h.ext.hookAnchor=P(h.x,h.z);h.ext.hookUntil=g.time+2;spell.shape='hook';}
+      }
+      if(key==='R'){
+        dashTo(target.x-dir.x*3,target.z-dir.z*3,range);for(const prior of g.zones.filter(z=>z.kind==='camille-duel'&&z.sourceId===h.id))prior.dead=true;
+        zone(g,h,'camille-duel','R',target.x,target.z,12,3,{targetId:target.id,fixed:true});spell.shape='ring';spell.x=target.x;spell.z=target.z;spell.target=target.id;spell.radius=12;
+      }
+      break;
   }
   return true;
 }
@@ -218,6 +292,9 @@ export function extendedProjectileHit(g,p,t,h){
     if(next){const bounce=g._tracking(h,next,p.damage*(t.alive?1:2),'physical','Q_BOUNCE');bounce.x=t.x;bounce.z=t.z;emit(g,h,'Q_BOUNCE','line',{fromX:t.x,fromZ:t.z,toX:next.x,toZ:next.z,x:next.x,z:next.z,radius:1});}
   }
   if(id==='sona'&&key==='R')stun(g,t,1.5);
+  if(id==='kaisa'&&key==='W'){
+    addPlasma(g,h,t,h.ext.evolutions.W?3:2);if(h.ext.evolutions.W&&t.kind==='hero')h.cooldowns.W*=.3;
+  }
   return true;
 }
 export function extendedProjectileEnd(g,p,h){if(p.explodeAtEnd&&!p.dead&&h){const target={x:p.x,z:p.z,hp:1,alive:true,team:p.team==='blue'?'red':'blue'};extendedProjectileHit(g,p,target,h);}}
@@ -225,7 +302,12 @@ export function extendedProjectileEnd(g,p,h){if(p.explodeAtEnd&&!p.dead&&h){cons
 export function extendedZoneUpdate(g,z){
   if(z.type!=='extended')return false;
   const h=g.getEntity(z.sourceId);if(!h){z.dead=true;return true;}
-  if(z.follow){z.x=h.x;z.z=h.z;}if(z.targetId){const t=g.getEntity(z.targetId);if(t?.alive){z.x=t.x;z.z=t.z;}}
+  if(z.follow){z.x=h.x;z.z=h.z;}if(z.targetId&&!z.fixed){const t=g.getEntity(z.targetId);if(t?.alive){z.x=t.x;z.z=t.z;}}
+  if(z.kind==='camille-duel'){
+    const t=g.getEntity(z.targetId);if(!h.alive||!t?.alive||g.time>=z.until||dist(h,z)>z.radius){z.dead=true;return true;}
+    if(dist(t,z)>z.radius-.5){const p=extendedRestrictPosition(g,t,t);t.x=p.x;t.z=p.z;t._route=null;}
+    return true;
+  }
   if(z.kind==='ziggs-satchel'){if(z.until<=g.time)detonateSatchel(g,h,z);return true;}
   if(z.armedAt>g.time)return true;
   if(z.kind==='veigar-cage'){
@@ -256,7 +338,7 @@ export function extendedZoneUpdate(g,z){
 }
 
 export function cancelExtendedChannel(g,h){
-  if(!h.ext?.channel)return;h.ext.channel=null;h.meditateUntil=0;for(const z of g.zones)if(z.sourceId===h.id&&z.kind==='mf-channel')z.dead=true;
+  if(!h.ext?.channel)return;if(h.ext.channel.type==='gate')emit(g,h,'GATE_CANCEL','ring',{radius:3});h.ext.channel=null;h.meditateUntil=0;for(const z of g.zones)if(z.sourceId===h.id&&z.kind==='mf-channel')z.dead=true;
 }
 export function extendedHeroUpdate(g,h,dt){
   if(!h.ext)return false;
@@ -266,18 +348,33 @@ export function extendedHeroUpdate(g,h,dt){
   if(h.heroId==='blitzcrank'&&h.hp/h.maxHp<.3&&!(h.ext.manaBarrierAt>g.time)){g._shield(h,h.maxMana*.35,5);h.ext.manaBarrierAt=g.time+60;emit(g,h,'PASSIVE','shield',{radius:5});}
   if(h.heroId==='blitzcrank'&&h.overdriveSlowAt&&g.time>=h.overdriveSlowAt){h.slowUntil=g.time+1;h.slowPower=.3;h.overdriveSlowAt=0;}
   if(h.heroId==='vayne'&&h.vayneStealthUntil<=g.time)h.stealthed=false;
+  if(h.heroId==='twistedfate'){
+    if(h.ext.cardCycle){if(h.ext.cardCycle.until<=g.time)h.ext.cardCycle=null;else h.ext.cardChoice=cardChoice(g,h);}
+    if(h.ext.cardUntil<=g.time)h.ext.lockedCard=null;
+    if(h.ext.destinyUntil<=g.time)h.ext.gateReady=false;
+  }
+  if(h.heroId==='camille'){
+    if(h.ext.camilleQUntil<=g.time){h.ext.camilleQStage=0;h.ext.camilleQArmed=0;}
+    if(h.ext.hookUntil<=g.time)h.ext.hookAnchor=null;
+  }
+  if(h.heroId==='kaisa'&&h.kaisaEUntil){
+    if(h.stunUntil>g.time||h.airborneUntil>g.time){h.kaisaEUntil=0;h.stealthed=false;}
+    else if(h.kaisaEUntil<=g.time){h.kaisaEUntil=0;h.stealthed=false;h.kaisaAttackUntil=g.time+4;emit(g,h,'E_READY','shield',{radius:5});}
+  }
   const channel=h.ext.channel;if(!channel)return false;
-  if(h.stunUntil>g.time||h.airborneUntil>g.time||h.silenceUntil>g.time){cancelExtendedChannel(g,h);return false;}
+  if(h.stunUntil>g.time||h.airborneUntil>g.time||h.silenceUntil>g.time||h.charmUntil>g.time||h.fearUntil>g.time||h.tauntUntil>g.time||channel.type==='gate'&&h.rootUntil>g.time){cancelExtendedChannel(g,h);return false;}
   if(channel.type==='meditate'){heal(g,h,(28+(h.skillLevels.W||1)*12+h.ap*.12)*dt);h.meditateUntil=channel.until;}
   if(g.time>=channel.until){
     if(channel.type==='snipe'){const target=g.getEntity(channel.targetId);if(target?.alive){const p=g._tracking(h,target,channel.damage,'physical','R');p.radius=1;p.speed=95;emit(g,h,'R_FIRE','line',{x:target.x,z:target.z,toX:target.x,toZ:target.z,target:target.id,radius:1});}}
+    if(channel.type==='gate'){const from=P(h.x,h.z);h.ext.channel=null;g._dash(h,channel.x,channel.z,150);emit(g,h,'GATE','dash',{fromX:from.x,fromZ:from.z,toX:h.x,toZ:h.z,radius:5});return false;}
     cancelExtendedChannel(g,h);return false;
   }
   return true;
 }
 
-export function extendedAttackSpeed(g,h){let multiplier=1;if(h.flurryHits>0&&h.flurryUntil>g.time)multiplier*=1.4;if(h.highlanderUntil>g.time)multiplier*=1.65;if(h.overdriveUntil>g.time)multiplier*=1.45;if(h.strutUntil>g.time)multiplier*=1.6;if(h.attackSlowUntil>g.time)multiplier*=.65;return multiplier;}
-export function extendedMoveSpeed(g,h,target){let multiplier=1;if(h.highlanderUntil>g.time){h.slowUntil=0;multiplier*=1.4;}if(h.overdriveUntil>g.time)multiplier*=1.45;if(h.strutUntil>g.time)multiplier*=1.25;if(h.heroId==='vayne'&&foes(g,h,40,e=>e.kind==='hero'&&g.isVisible(e,h.team)).some(t=>(t.x-h.x)*(target.x-h.x)+(t.z-h.z)*(target.z-h.z)>0))multiplier*=1.2;return multiplier;}
+export function extendedAttackSpeed(g,h){let multiplier=1;if(h.flurryHits>0&&h.flurryUntil>g.time)multiplier*=1.4;if(h.highlanderUntil>g.time)multiplier*=1.65;if(h.overdriveUntil>g.time)multiplier*=1.45;if(h.strutUntil>g.time)multiplier*=1.6;if(h.kaisaAttackUntil>g.time)multiplier*=1.5;if(h.camilleAttackUntil>g.time)multiplier*=1.4;if(h.attackSlowUntil>g.time)multiplier*=.65;return multiplier;}
+export function extendedMoveSpeed(g,h,target){let multiplier=1;if(h.highlanderUntil>g.time){h.slowUntil=0;multiplier*=1.4;}if(h.overdriveUntil>g.time)multiplier*=1.45;if(h.strutUntil>g.time)multiplier*=1.25;if(h.kaisaEUntil>g.time)multiplier*=1.5;if(h.camilleHasteUntil>g.time)multiplier*=1.2;if(h.heroId==='vayne'&&foes(g,h,40,e=>e.kind==='hero'&&g.isVisible(e,h.team)).some(t=>(t.x-h.x)*(target.x-h.x)+(t.z-h.z)*(target.z-h.z)>0))multiplier*=1.2;return multiplier;}
+export function extendedAttackType(g,h){return h.heroId==='camille'&&h.ext.camilleQArmed===2&&g.time>=h.ext.camilleQReadyAt&&h.ext.camilleQUntil>g.time?'true':'physical';}
 export function extendedAttackAmount(g,h,t,amount){
   if(!h.ext)return amount;
   h.ext.attacks++;
@@ -288,6 +385,7 @@ export function extendedAttackAmount(g,h,t,amount){
   if(h.heroId==='vayne'){if(h.finalHourUntil>g.time)amount+=20+(h.skillLevels.R||1)*10;if(h.vayneQUntil>g.time){amount+=h.attack*(.2+(h.skillLevels.Q||1)*.1);h.vayneQUntil=0;}h.vayneStealthUntil=0;h.stealthed=false;}
   if(h.heroId==='darius'&&h.dariusWUntil>g.time){amount*=1.4;h.dariusWUntil=0;slow(g,t,.75,1.5);}
   if(h.heroId==='blitzcrank'&&h.powerFistUntil>g.time)amount*=1.8;
+  if(h.heroId==='camille'&&h.ext.camilleQArmed&&h.ext.camilleQUntil>g.time)amount*=1.2+(h.skillLevels.Q||1)*.05;
   return amount;
 }
 export function extendedAttackHit(g,h,t,amount){
@@ -301,6 +399,28 @@ export function extendedAttackHit(g,h,t,amount){
   if(h.heroId==='leona'&&h.leonaQUntil>g.time){h.leonaQUntil=0;g._damage(t,20+(h.skillLevels.Q||1)*15+h.ap*.3,'magic',h,'Q');stun(g,t,1);}
   if(h.heroId==='vayne'&&h.skillLevels.W&&!structure(t)){const state=h.ext.silver[t.id]||{stacks:0,until:0};if(h.ext.lastSilverTarget!==t.id)for(const prior of Object.values(h.ext.silver))prior.stacks=0;state.stacks=state.until>g.time?state.stacks+1:1;state.until=g.time+4;h.ext.silver[t.id]=state;h.ext.lastSilverTarget=t.id;if(state.stacks>=3){state.stacks=0;g._damage(t,Math.max(35,t.maxHp*(.035+h.skillLevels.W*.012)),'true',h,'W');emit(g,h,'W_HIT','ring',{x:t.x,z:t.z,radius:4,target:t.id});}}
   if(h.heroId==='sona'&&h.powerChordReady){h.powerChordReady=false;g._damage(t,20+h.level*8+h.ap*.25,'magic',h,'POWER_CHORD');}
+  if(h.heroId==='twistedfate'){
+    if(h.skillLevels.E){h.ext.stackedDeck=(h.ext.stackedDeck||0)+1;if(h.ext.stackedDeck>=4){h.ext.stackedDeck=0;g._damage(t,30+h.skillLevels.E*20+h.ap*.5,'magic',h,'E');emit(g,h,'E_HIT','ring',{x:t.x,z:t.z,target:t.id,radius:4});}}
+    if(h.ext.lockedCard&&h.ext.cardUntil>g.time){const card=h.ext.lockedCard,rank=h.skillLevels.W||1;h.ext.lockedCard=null;h.ext.cardUntil=0;
+      if(card==='blue'){g._damage(t,30+rank*25+h.ap*.6,'magic',h,'W');h.mana=Math.min(h.maxMana,h.mana+50+rank*15);}
+      if(card==='red'){for(const victim of foes(g,{x:t.x,z:t.z,team:h.team},9)){g._damage(victim,20+rank*20+h.ap*.5,'magic',h,'W');slow(g,victim,.45,2);}}
+      if(card==='gold'){g._damage(t,15+rank*15+h.ap*.4,'magic',h,'W');stun(g,t,1.1+rank*.15);}
+      emit(g,h,`CARD_${card.toUpperCase()}`,'ring',{card,x:t.x,z:t.z,target:t.id,radius:card==='red'?9:4});
+    }
+  }
+  if(h.heroId==='kaisa'&&!structure(t)&&t.alive){g._damage(t,5+h.level*1.5+h.ap*.1,'magic',h,'PLASMA_HIT');addPlasma(g,h,t,1);}
+  if(h.heroId==='camille'){
+    if(t.kind==='hero'&&!(h.ext.adaptiveShieldAt>g.time)){g._shield(h,h.maxHp*.15,2);h.ext.adaptiveShieldAt=g.time+16;emit(g,h,'PASSIVE','shield',{radius:5});}
+    if(h.ext.camilleQArmed&&h.ext.camilleQUntil>g.time){const stage=h.ext.camilleQArmed;h.ext.camilleQArmed=0;h.camilleHasteUntil=g.time+1;
+      if(stage===1){h.ext.camilleQStage=1;h.ext.camilleQReadyAt=g.time+1.5;h.ext.camilleQUntil=g.time+4;}else{h.ext.camilleQStage=0;h.ext.camilleQUntil=0;}
+      emit(g,h,stage===2?'Q2_HIT':'Q_HIT','line',{x:t.x,z:t.z,target:t.id,toX:t.x,toZ:t.z,radius:3});
+    }
+  }
+}
+function addPlasma(g,h,t,layers){
+  if(!t.alive||structure(t)||t.kind==='ward')return;t.kaisaPlasma??={};const state=t.kaisaPlasma[h.id],prior=state?.until>g.time?state.stacks:0,stacks=prior+layers;
+  t.kaisaPlasma[h.id]={stacks:stacks>=5?0:stacks,until:g.time+4};h.ext.lastPlasmaTarget=t.id;
+  if(stacks>=5){g._damage(t,35+h.level*4+h.ap*.35+(t.maxHp-t.hp)*(.12+h.ap*.00015),'magic',h,'PLASMA_BURST');emit(g,h,'PLASMA_BURST','ring',{x:t.x,z:t.z,target:t.id,radius:6});}
 }
 export function extendedAnyAttackHit(g,h,t){
   if(t.sunlightUntil>g.time){const source=g.getEntity(t.sunlightSource);t.sunlightUntil=0;g._damage(t,20+(source?.level||1)*5,'magic',source||h,'SUNLIGHT');}
@@ -312,9 +432,20 @@ export function extendedDamageAmount(g,t,source,amount,type,key){
   if(t.heroId==='malphite')t.graniteShieldUntil=0;
   return amount;
 }
+export function extendedRestrictPosition(g,e,point){
+  let p={x:point.x,z:point.z};
+  for(const z of g.zones)if(!z.dead&&z.kind==='camille-duel'&&z.targetId===e.id&&z.until>g.time){
+    const owner=g.getEntity(z.sourceId);if(!owner?.alive||dist(owner,z)>z.radius)continue;
+    const d=dist(p,z),radius=z.radius-.5;if(d<=radius)continue;
+    const edge=P(z.x+(p.x-z.x)/d*radius,z.z+(p.z-z.z)/d*radius),safe=g.navigation?g.navigation.nearestPoint(edge):edge;
+    p=dist(safe,z)<=radius+.01?safe:g.navigation?g.navigation.nearestPoint(z):P(z.x,z.z);
+  }
+  return p;
+}
+export function extendedLastHit(g,h,t){if(h?.heroId==='twistedfate'&&t.kind==='minion'&&t.minionType!=='summon'){const gold=1+Math.floor(Math.random()*6);g._award(h,gold,0);emit(g,h,'LOADED_DICE','ring',{x:t.x,z:t.z,radius:3,gold});}}
 export function extendedAfterDamage(g,h,t,amount,key){if(h?.heroId==='morgana'&&amount>0&&['Q','W','R'].includes(key)&&['hero','monster'].includes(t.kind))heal(g,h,amount*.15);}
 export function extendedKill(g,h){if(h?.heroId==='masteryi'){for(const key of ['Q','W','E'])h.cooldowns[key]*=.3;if(h.highlanderUntil>g.time)h.highlanderUntil=g.time+7;}if(h?.heroId==='veigar'){h.ext.veigarAp+=5;h.ap+=5;}}
-export function extendedDeath(g,h){if(!h.ext)return;cancelExtendedChannel(g,h);for(const key of ['overdriveSlowAt','sonicMarkUntil','fizzWUntil','wujuUntil','highlanderUntil','flurryUntil','dariusWUntil','noxianMightUntil','malphiteWUntil','overdriveUntil','powerFistUntil','leonaQUntil','finalHourUntil','vayneQUntil','vayneStealthUntil','strutUntil','blackShieldUntil','graniteShieldUntil'])h[key]=0;h.stealthed=false;h.flurryHits=0;h.powerChordReady=false;h.ext.annieStacks=0;h.ext.silver={};h.ext.lastSilverTarget=0;h.ext.trapHeadshots={};h.ext.casts=0;}
+export function extendedDeath(g,h){for(const z of g.zones)if(z.kind==='camille-duel'&&(z.sourceId===h.id||z.targetId===h.id))z.dead=true;if(!h.ext)return;cancelExtendedChannel(g,h);for(const key of ['overdriveSlowAt','sonicMarkUntil','fizzWUntil','wujuUntil','highlanderUntil','flurryUntil','dariusWUntil','noxianMightUntil','malphiteWUntil','overdriveUntil','powerFistUntil','leonaQUntil','finalHourUntil','vayneQUntil','vayneStealthUntil','strutUntil','blackShieldUntil','graniteShieldUntil','kaisaEUntil','kaisaAttackUntil','camilleAttackUntil','camilleHasteUntil'])h[key]=0;h.stealthed=false;h.flurryHits=0;h.powerChordReady=false;h.ext.annieStacks=0;h.ext.silver={};h.ext.lastSilverTarget=0;h.ext.trapHeadshots={};h.ext.casts=0;h.ext.cardCycle=null;h.ext.lockedCard=null;h.ext.cardUntil=0;h.ext.destinyUntil=0;h.ext.gateReady=false;h.ext.camilleQStage=0;h.ext.camilleQArmed=0;h.ext.camilleQUntil=0;h.ext.hookUntil=0;h.ext.hookAnchor=null;}
 
 export function extendedSummonUpdate(g,e,dt){
   if(!e.summonType)return false;const h=g.getEntity(e.summonOwner);if(!h?.alive||g.time>=e.expiresAt){e.alive=false;return true;}
@@ -343,6 +474,15 @@ export function extendedAI(g,h,t){
     case 'caitlyn':if(d<60)cast('Q');if(d<25)cast('W');if(d<20)cast('E');if(t.kind==='hero'&&d>30&&d<110&&t.hp/t.maxHp<.5)cast('R');break;
     case 'missfortune':if(d<30)cast('Q');if(d<35)cast('W');if(d<44)cast('E');if(t.kind==='hero'&&d<62&&d>15)cast('R');break;
     case 'sona':if(d<30)cast('Q');if(health<.85||allies(g,h,25).some(a=>a.hp/a.maxHp<.7))cast('W');if(d>20)cast('E');if(t.kind==='hero'&&d<48)cast('R');break;
+    case 'twistedfate':
+      if(h.ext.cardCycle){if(cardChoice(g,h)===(t.kind==='hero'?'gold':h.mana<h.maxMana*.5?'blue':'red'))cast('W');}else if(!h.ext.lockedCard&&d<32)cast('W');
+      if(d<58)cast('Q');if(rank&&t.kind==='hero'&&d>25&&t.hp/t.maxHp<.7){if(h.ext.gateReady)g._cast(h,'R',t.x-(t.x-h.x)/(d||1)*20,t.z-(t.z-h.z)/(d||1)*20);else cast('R');}break;
+    case 'kaisa':
+      if(d<25)cast('Q');if(d<90)cast('W');if(t.kind==='hero'&&d>32&&t.kaisaPlasma?.[h.id]?.stacks>0)cast('R');if(d<35&&health>.35&&!(h.kaisaAttackUntil>g.time))cast('E');break;
+    case 'camille':
+      if(d<28&&extendedRecast(g,h,'E'))cast('E');else if(d>13&&h.cooldowns.E<=0){const walls=(g.navigation?.obstacles||[]).filter(o=>dist(h,o)<30+o.r).sort((a,b)=>dist(a,t)-dist(b,t));if(walls[0])g._cast(h,'E',walls[0].x,walls[0].z);}
+      if(d<10){if(!h.ext.camilleQArmed&&(h.ext.camilleQStage!==1||g.time>=h.ext.camilleQReadyAt))cast('Q');if(t.kind==='hero'&&health>.35)cast('R');}
+      if(d<24&&d>10)cast('W');break;
   }
   return true;
 }

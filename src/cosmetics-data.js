@@ -24,6 +24,9 @@ const entries = [
   ['caitlyn','星际治安官','space',0x526781,0x8fdef7,'长帽换上银蓝太空涂装，精密步枪佩戴星际组件。'],
   ['missfortune','糖果海盗','candy',0xff819d,0xffe2a1,'草莓船长帽、奶油双枪与星糖饰物。'],
   ['sona','月霜琴师','frost',0x657aa7,0xb4edff,'冰蓝长发与晶霜琴台，寒晶环绕她的旋律。'],
+  ['twistedfate','星轨牌术师','cosmic',0x423d75,0xa9ddff,'深空长风衣和星轨宽檐帽，三色牌化作流转的银河符卡。'],
+  ['kaisa','电玩虚空','arcade',0x4e2b83,0x71f5de,'霓虹虚空甲与像素肩炮，电浆闪耀青紫色电玩光辉。'],
+  ['camille','冰刃舞者','frost',0x54798d,0xc3f4ff,'霜钢刀腿、冰蓝装甲与寒晶钩索，优雅地切开战场。'],
 ];
 export const SKINS = entries.map(([championId,name,theme,color,accent,description],index)=>({
   id:`${championId}-${theme}`,championId,name,price:index%4===0?1820:1350,theme,color,accent,description,

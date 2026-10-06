@@ -4,7 +4,7 @@ import concurrent.futures, json, pathlib, urllib.request
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 OUT = ROOT / 'public/assets'
 VERSION = json.load(urllib.request.urlopen('https://ddragon.leagueoflegends.com/api/versions.json'))[0]
-CHAMPIONS = {'annie':'Annie','brand':'Brand','morgana':'Morgana','veigar':'Veigar','ziggs':'Ziggs','fizz':'Fizz','masteryi':'MasterYi','leesin':'LeeSin','darius':'Darius','malphite':'Malphite','blitzcrank':'Blitzcrank','leona':'Leona','vayne':'Vayne','caitlyn':'Caitlyn','missfortune':'MissFortune','sona':'Sona'}
+CHAMPIONS = {'annie':'Annie','brand':'Brand','morgana':'Morgana','veigar':'Veigar','ziggs':'Ziggs','fizz':'Fizz','masteryi':'MasterYi','leesin':'LeeSin','darius':'Darius','malphite':'Malphite','blitzcrank':'Blitzcrank','leona':'Leona','vayne':'Vayne','caitlyn':'Caitlyn','missfortune':'MissFortune','sona':'Sona','twistedfate':'TwistedFate','kaisa':'Kaisa','camille':'Camille'}
 SUMMONERS = {'flash':'SummonerFlash','ignite':'SummonerDot','heal':'SummonerHeal','ghost':'SummonerHaste','barrier':'SummonerBarrier','exhaust':'SummonerExhaust','cleanse':'SummonerBoost','teleport':'SummonerTeleport','smite':'SummonerSmite','clarity':'SummonerMana'}
 
 def fetch(pair):

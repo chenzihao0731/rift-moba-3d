@@ -5,6 +5,8 @@ import { createExtendedHero, EXTENDED_HERO_IDS } from './hero-models.js';
 import { applySkin, updateSkin } from './skin-effects.js';
 import { getSkin } from './cosmetics-data.js';
 import { addHeroDetail, curvedTail, restoreFaceMaterials } from './hero-detail.js';
+import {makeCard} from './triad-models.js';
+import {triadSpell,triadAction,animateTriad} from './triad-effects.js';
 const materials = new Map(), geometries = new Map();
 const mergedModels=new Map();
 const vertexMaterials=new Map();
@@ -118,11 +120,19 @@ function optimizeHero(group,e){
  const groups=[];const collect=(node,path)=>{for(const [index,child]of node.children.entries())if(child.isGroup){groups.push({group:child,path:`${path}:${index}`});collect(child,`${path}:${index}`);}};collect(group.userData.body,'body');
  for(const {group:partGroup,path}of groups)if(partGroup.children.some(child=>child.isMesh))mergeStaticModel(partGroup,{...modelEntity,minionType:`animated-${path}`},true);
 }
-const MAGIC = {ahri:0x77efff,ashe:0x8eeaff,garen:0xffcf73,lux:0xffe59d,ezreal:0x55daff,yasuo:0xa8f3e5,teemo:0x9ee462,jinx:0xff77bc,annie:0xff8a57,brand:0xffae53,morgana:0xbc75ed,veigar:0xb27fff,ziggs:0xffc671,fizz:0x7ae8ee,masteryi:0x97f2b1,leesin:0xffd488,darius:0xf7736c,malphite:0xe0bd8b,blitzcrank:0x80edff,leona:0xffdd90,vayne:0xd8a6ff,caitlyn:0x90d9ff,missfortune:0xffb488,sona:0x7ce8d8};
+const MAGIC = {ahri:0x77efff,ashe:0x8eeaff,garen:0xffcf73,lux:0xffe59d,ezreal:0x55daff,yasuo:0xa8f3e5,teemo:0x9ee462,jinx:0xff77bc,annie:0xff8a57,brand:0xffae53,morgana:0xbc75ed,veigar:0xb27fff,ziggs:0xffc671,fizz:0x7ae8ee,masteryi:0x97f2b1,leesin:0xffd488,darius:0xf7736c,malphite:0xe0bd8b,blitzcrank:0x80edff,leona:0xffdd90,vayne:0xd8a6ff,caitlyn:0x90d9ff,missfortune:0xffb488,sona:0x7ce8d8,twistedfate:0xffd46c,kaisa:0xc594ff,camille:0x71eed9};
 function missileColor(p){if(p.skinAccent)return p.skinAccent;return p.hero==='ahri'&&p.skill==='E'?0xff78bc:p.hero==='ahri'&&['W','R'].includes(p.skill)?0xbe8aff:p.hero==='jinx'&&p.rocket?0xffbb60:MAGIC[p.hero]||(p.team==='blue'?0x5bcee7:0xff7a8d);}
 function missile(p){
  const group=new THREE.Group(),color=missileColor(p),ultimate=p.skill==='R',attack=p.skill==='attack',size=ultimate?.9:attack?.24:.5;
- if(p.hero==='yasuo'&&p.skill==='Q3'){
+ if(p.hero==='twistedfate'){
+  const cardGroup=new THREE.Group();group.add(cardGroup);makeCard(cardGroup,{box,part,geo},({blue:0x58a6ff,red:0xff5e6d,gold:0xffd75c}[p.card])||color,.66,.94);group.userData.spinCard=cardGroup;group.userData.shape='card';group.name='twistedfate-flying-card';
+ }else if(p.hero==='kaisa'){
+  const long=p.skill==='W',tip=part(group,geo('plasmaMissile',()=>new THREE.OctahedronGeometry(1)),color,0,0,.18,[long?.35:.18,long?.32:.17,long?1.7:.65],true);
+  sphere(group,0xf1d9ff,0,0,.35,[long?.18:.085,long?.16:.085,long?.7:.24],true);
+  for(const side of[-1,1])rod(group,color,[side*(long?.18:.08),0,-(long?1.8:.6)],[side*.05,0,.3],long?.045:.025);
+  if(long){const halo=ring(group,color,.48,0,.035);halo.rotation.x=0;halo.position.z=-.35;group.userData.rings=[halo];}
+  group.userData.shape='plasma-missile';group.name=long?'kaisa-void-seeker':'kaisa-icathian-missile';
+ }else if(p.hero==='yasuo'&&p.skill==='Q3'){
   const rings=[];for(let i=0;i<4;i++){const r=ring(group,color,.7+i*.27,-.8+i*.85,.12);r.position.z=(i%2?1:-1)*.1;rings.push(r);}galeCone(group,color);group.userData.rings=rings;
  }else if(p.hero==='jinx'&&(ultimate||p.rocket)){
   const barrel=cylinder(group,0x41606c,0,0,0,ultimate?.64:.28,ultimate?3.3:1.6);barrel.rotation.x=Math.PI/2;
@@ -158,9 +168,16 @@ function createZone(zone){
  group.userData.kind=kind;group.userData.rotation=0;
  if(zone.type==='extended'){
   const color=zone.color||MAGIC[zone.hero]||0xc1a4ef;
-  const edge=zoneMesh(group,geo('zoneRing',()=>new THREE.RingGeometry(.95,1,48)),color,.58,0,.05,0,[r,r,r]);edge.rotation.x=-Math.PI/2;group.userData.edge=edge;
-  const fill=zoneMesh(group,geo('zoneCircle',()=>new THREE.CircleGeometry(1,48)),color,kind.includes('pool')||kind.includes('fire')?.12:.04,0,.02,0,[r,r,r]);fill.rotation.x=-Math.PI/2;
-  if(kind==='veigar-cage'){
+  const edge=zoneMesh(group,geo(kind==='camille-duel'?'zoneHexRing':'zoneRing',()=>new THREE.RingGeometry(.95,1,kind==='camille-duel'?6:48)),color,.58,0,.05,0,[r,r,r]);edge.rotation.x=-Math.PI/2;group.userData.edge=edge;
+  const fill=zoneMesh(group,geo(kind==='camille-duel'?'zoneHexCircle':'zoneCircle',()=>new THREE.CircleGeometry(1,kind==='camille-duel'?6:48)),color,kind.includes('pool')||kind.includes('fire')?.12:.04,0,.02,0,[r,r,r]);fill.rotation.x=-Math.PI/2;
+  if(kind==='camille-duel'){
+   group.name='camille-hextech-ultimatum';group.userData.shape='hexagon';
+   for(let i=0;i<6;i++){const a=i*Math.PI/3,b=(i+1)*Math.PI/3,x=Math.cos(a)*r,z=-Math.sin(a)*r,xx=Math.cos(b)*r,zz=-Math.sin(b)*r;
+    const pillar=zoneMesh(group,geo('zoneCrystal',()=>new THREE.OctahedronGeometry(1)),color,.76,x,1.45,z,[.28,1.5,.28]);
+    const wall=zoneMesh(group,geo('zoneBox',()=>new THREE.BoxGeometry(1,1,1)),color,.055,(x+xx)*.5,1.6,(z+zz)*.5,[.1,3.2,r]);wall.rotation.y=Math.atan2(xx-x,zz-z);
+    const rail=zoneMesh(group,geo('zoneBox',()=>new THREE.BoxGeometry(1,1,1)),0xcffff7,.6,(x+xx)*.5,3.2,(z+zz)*.5,[.055,.075,r]);rail.rotation.y=wall.rotation.y;
+   }
+  }else if(kind==='veigar-cage'){
    for(let i=0;i<8;i++){const a=i*Math.PI/4,x=Math.sin(a)*r,z=Math.cos(a)*r;zoneMesh(group,geo('zoneCrystal',()=>new THREE.OctahedronGeometry(1)),color,.75,x,2.7,z,[.55,2.5,.55]);zoneMesh(group,geo('zoneBox',()=>new THREE.BoxGeometry(1,1,1)),color,.3,x,1.5,z,[.2,3,.2]);}
   }else if(kind==='fizz-shark'){
    sphere(group,0x497d94,0,1.1,0,[1.6,.74,3.5]);sphere(group,0xd5ebe1,0,.85,1.8,[1.4,.43,1.4]);const fin=part(group,geo('sharkFin',()=>new THREE.ConeGeometry(.84,2.2,3)),0x527c8e,0,2.25,-.3,[.32,1,1]);fin.rotation.x=-.28;
@@ -254,6 +271,7 @@ export class Actors {
       if(t>=1)a.swordAction=null;
      }
     }
+    animateTriad(a,e,dt,time,game);
     if(data.rocket)data.rocket.visible=!!e.rocketMode;
     if(data.shield){data.shield.visible=e.shield>0&&e.shieldUntil>game.time||e.barrierHp>0&&e.barrierUntil>game.time;data.shield.material.opacity=.12+Math.sin(time*4)*.025;}
     if(dt>0&&active){
@@ -267,6 +285,9 @@ export class Actors {
     }
    }
    for(const wheel of data.wheels||[])if(moving)wheel.rotation.x+=Math.hypot(dx,dz)*1.5;
+   const plasma=Object.values(e.kaisaPlasma||{}).filter(state=>state.until>game.time&&state.stacks>0).sort((one,two)=>two.stacks-one.stacks)[0];
+   if(plasma&&!a.plasmaMark){const marker=new THREE.Group();marker.name='kaisa-plasma-stack-indicator';marker.position.y=e.kind==='hero'?4.9:3.3;for(let i=0;i<4;i++){const shard=part(marker,geo('plasmaStackShard',()=>new THREE.OctahedronGeometry(1)),0xca96ff,(i-1.5)*.39,0,0,[.12,.24,.07],true);shard.userData.stack=i+1;}a.mesh.add(marker);a.plasmaMark=marker;}
+   if(a.plasmaMark){a.plasmaMark.visible=!!plasma;a.plasmaMark.rotation.y=-a.mesh.rotation.y;for(const shard of a.plasmaMark.children)shard.visible=!!plasma&&shard.userData.stack<=plasma.stacks;}
    if(dt>0)for(const wing of data.wings||[])wing.rotation.x=-.5+Math.sin(time*1.7)*.055;
    if(data.crystal&&dt>0){data.crystal.rotation.y=time*.3;data.crystal.position.y=5.2+Math.sin(time*2)*.2;}
    if(a.label){const h=e.kind==='hero'?(data.modelHeight||(e.heroId==='teemo'?4.9:6)):e.summonType==='tibbers'?7:e.kind==='tower'?11:e.kind==='nexus'?12:e.kind==='inhibitor'?5:e.kind==='monster'?(['dragon','baron'].includes(e.monsterType)?10:4.6):e.minionType==='super'?5:3.8;this._projection.set(e.x,h+a.mesh.position.y,e.z).project(camera);const on=this._projection.z<1&&this._projection.x>-1.1&&this._projection.x<1.1&&this._projection.y>-1.1&&this._projection.y<1.1;a.label.style.display=on?'':'none';a.label.style.transform=`translate(${(this._projection.x*.5+.5)*width}px,${(-this._projection.y*.5+.5)*height}px) translate(-50%,-100%)`;a.label.querySelector('i').style.width=`${Math.max(0,e.hp/e.maxHp)*100}%`;a.label.querySelector('.entity-name').textContent=e.kind==='hero'?`${e.id===game.player.id?'你 · ':''}${e.name||e.heroId} ${e.level||1}`:e.kind==='monster'||e.summonType?(e.name||'野怪'):'';}
@@ -275,9 +296,9 @@ export class Actors {
   for(const [id,a]of this.map)if(!keep.has(id)){this.scene.remove(a.mesh);a.mesh.userData.shield?.material.dispose();a.label?.remove();this.map.delete(id);}
   const projectiles=new Set();
   for(const p of game.projectiles||[]){
-   if(p.dead)continue;projectiles.add(p.id);let mesh=this.projectiles.get(p.id);if(!mesh){const source=game.getEntity?.(p.sourceId),skin=getSkin(source?.skinId);p.skinAccent=skin&&skin.championId===p.hero?skin.accent:undefined;mesh=missile(p);this.scene.add(mesh);this.projectiles.set(p.id,mesh);}
+   if(p.dead)continue;projectiles.add(p.id);let mesh=this.projectiles.get(p.id);if(!mesh){const source=game.getEntity?.(p.sourceId),skin=getSkin(source?.skinId);p.skinAccent=skin&&skin.championId===p.hero?skin.accent:undefined;if(p.hero==='twistedfate'&&p.skill==='attack')p.card=source?.ext?.lockedCard;mesh=missile(p);this.scene.add(mesh);this.projectiles.set(p.id,mesh);}
    mesh.position.set(p.x,p.hero==='yasuo'&&p.skill==='Q3'?2:2.4,p.z);mesh.rotation.y=Math.atan2(p.dx,p.dz);mesh.visible=!active||p.team==='blue'||!game.isVisible||game.isVisible({alive:true,kind:'projectile',team:p.team,x:p.x,z:p.z});
-   if(dt>0){for(const [i,r]of(mesh.userData.rings||[]).entries())r.rotation.y=time*(i%2?4:-4);if(mesh.visible&&active){mesh.userData.trailAge+=dt;if(mesh.userData.trailAge>.035){mesh.userData.trailAge=0;const size=p.skill==='R'?1.2:p.skill==='attack'?.4:.7;this.effects.trail(p.x,2.3,p.z,missileColor(p),size,p.skill==='R'?5:2,p.hero==='ashe'?.65:.42);if(p.hero==='jinx'&&(p.rocket||p.skill==='R'))this.effects.trail(p.x-p.dx*1.1,2.3,p.z-p.dz*1.1,0xffaa45,size,3,.5);}}}
+   if(dt>0){if(mesh.userData.spinCard)mesh.userData.spinCard.rotation.z=time*8;for(const [i,r]of(mesh.userData.rings||[]).entries())r.rotation.y=time*(i%2?4:-4);if(mesh.visible&&active){mesh.userData.trailAge+=dt;if(mesh.userData.trailAge>.035){mesh.userData.trailAge=0;const size=p.skill==='R'?1.2:p.skill==='attack'?.4:p.hero==='kaisa'&&p.skill==='Q'?.35:.7;this.effects.trail(p.x,2.3,p.z,missileColor(p),size,p.skill==='R'?5:2,p.hero==='ashe'?.65:.42);if(p.hero==='jinx'&&(p.rocket||p.skill==='R'))this.effects.trail(p.x-p.dx*1.1,2.3,p.z-p.dz*1.1,0xffaa45,size,3,.5);}}}
   }
   for(const[id,mesh]of this.projectiles)if(!projectiles.has(id)){this.scene.remove(mesh);disposeOwned(mesh);this.projectiles.delete(id);}
   const zones=new Set();
@@ -307,6 +328,7 @@ export class Actors {
   if(e.type==='gold')this.floating(x,z,`+${e.amount||0} 金币`,'#e8c775');
   if(['attack','spell'].includes(e.type)){
    const actor=this.map.get(e.source),dx=to.x-from.x,dz=to.z-from.z;
+   triadAction(actor,e,hero);
    if(actor&&Math.hypot(dx,dz)>.1){actor.aimAngle=Math.atan2(dx,dz);actor.aimUntil=(this.game?.time||0)+.5;}
    if(actor&&hero==='yasuo'){
     if(e.type==='attack')actor.swordAction={mode:'swing',age:0,duration:.28};
@@ -385,6 +407,7 @@ export class Actors {
  }
  extendedSpell(e,hero,from,to,color,liveMissiles){
   const fx=this.effects,x=e.x??to.x,z=e.z??to.z,r=e.radius||6,shape=e.shape||'circle',fire=['annie','brand','ziggs','missfortune'].includes(hero),tint=color||MAGIC[hero];
+  if(triadSpell(fx,e,hero,from,to,tint,{liveMissiles,source:this.game?.getEntity?.(e.source),resolve:id=>this.game?.getEntity?.(id)}))return;
   if(e.key==='MARK'||e.key==='STUN'||e.key==='ROOT'){fx.rune(x,z,tint,2.8,.65);fx.burst(x,1.8,z,tint,15,4,.4);return;}
   if(hero==='fizz'&&e.key==='R_HIT'){fx.shark(x,z,tint);return;}
   if(e.key.includes('BOUNCE')){fx.lineBurst(from,to,tint,12,.08,.35);return;}

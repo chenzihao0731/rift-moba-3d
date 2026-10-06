@@ -5,12 +5,14 @@ const byId = new Map(ITEMS.map(item => [item.id, item]));
 const keys = ['1', '2', '3', '5', '6', '7'];
 const category = item => item.category === 'consumable' ? 'consumables' : item.component ? 'components' : 'equipment';
 const tags = { ad:'物理 攻击 射手 攻速 暴击', ap:'魔法 法师 法强', tank:'坦克 生命 护甲 防御', support:'辅助 治疗 护盾', mr:'魔抗 魔法抗性', penetration:'穿甲 破甲 护甲穿透' };
-const mageIds = new Set(['ahri','lux','teemo','annie','syndra','veigar','orianna','brand','viktor','xerath','fizz','akali','katarina','diana','aurelionsol']);
+const mageIds = new Set(['ahri','lux','teemo','annie','syndra','veigar','orianna','brand','viktor','xerath','fizz','akali','katarina','diana','aurelionsol','twistedfate']);
 const marksmanIds = new Set(['ashe','ezreal','jinx','caitlyn','vayne','missfortune','lucian','tristana','jhin','kaisa','varus','twitch','sivir']);
 const supportIds = new Set(['sona','soraka','nami','lulu','janna','seraphine','morgana','thresh','leona','blitzcrank','braum','yuumi']);
 
 export function recommendedItems(hero = {}) {
   const id = hero.heroId || hero.id || '', role = hero.role || '';
+  if (id === 'kaisa') return ['doran-blade','boots','bf-sword','pickaxe','recurve-bow','blasting-wand','berserkers','kraken-slayer','infinity','nashors-tooth','rabadon','zhonya','wits-end'];
+  if (id === 'twistedfate') return ['doran-ring','boots','lost-chapter','ludens','lich-bane','sorcerer-shoes','rabadon','zhonya','void-staff','banshee','rapid-firecannon'];
   if (id === 'ezreal') return ['doran-blade','boots','sheen','trinity-force','ionian-boots','blade-ruined','mortal-reminder','maw','quicksilver-sash'];
   if (['yasuo','yone','masteryi'].includes(id)) return ['doran-blade','boots','berserkers','blade-ruined','infinity','phantom-dancer','steraks','deaths-dance','mercurial-scimitar'];
   if (supportIds.has(id) || /辅助/.test(role)) return ['doran-ring','boots','ionian-boots','locket','redemption','shurelya','moonstone','mikaels','staff-flowing-water','ardent-censer'];
@@ -43,7 +45,7 @@ export class ShopView {
       if (this.getGame().sell(this.selectedSlot)) this.onChange();
       this.update();
     });
-    this.filters.innerHTML = `<div class="shop-search-row"><label class="shop-search"><span>搜索装备</span><input id="shop-search" type="search" placeholder="名称、属性或配方，如：魔抗" aria-label="搜索装备名称、属性或合成部件" autocomplete="off"></label><label class="shop-stat-label"><span class="sr-only-shop">属性分类</span><select id="shop-stat-filter" aria-label="装备属性分类"><option value="all">全部属性</option><option value="ad">物理 / 攻速</option><option value="ap">法术强度</option><option value="tank">生命 / 防御</option><option value="support">辅助 / 治疗</option><option value="mr">魔法抗性</option><option value="penetration">护甲穿透</option></select></label></div><div class="shop-filter-tabs">${[['recommended','英雄推荐'],['equipment', '成装与出门装'], ['components', '合成散件'], ['consumables', '药水与守卫'], ['all', '全部']].map(([id, name]) => `<button data-filter="${id}" aria-pressed="false">${name}</button>`).join('')}</div><p class="shop-result-summary" aria-live="polite"></p>`;
+    this.filters.innerHTML = `<div class="shop-search-row"><label class="shop-search"><span>搜索装备</span><input id="shop-search" type="search" placeholder="名称、属性或配方，如：魔抗" aria-label="搜索装备名称、属性或合成部件" autocomplete="off"></label><label class="shop-stat-label"><span class="sr-only-shop">属性分类</span><select id="shop-stat-filter" aria-label="装备属性分类"><option value="all">全部属性</option><option value="ad">物理 / 攻速</option><option value="ap">法术强度</option><option value="tank">生命 / 防御</option><option value="support">辅助 / 治疗</option><option value="mr">魔法抗性</option><option value="penetration">护甲穿透</option></select></label></div><div class="shop-filter-tabs">${[['recommended','英雄推荐'],['equipment', '成装与出门装'], ['components', '合成散件'], ['consumables', '药水与守卫'], ['all', '全部']].map(([id, name]) => `<button data-filter="${id}" aria-pressed="false">${name}</button>`).join('')}</div><p class="shop-result-summary" aria-live="polite"></p><p class="shop-recommendation-note hidden"></p>`;
     this.filters.querySelector('#shop-search').addEventListener('input',event=>{
       this.query=event.target.value;
       // Search across the full catalog rather than silently excluding hidden categories.
@@ -92,7 +94,25 @@ export class ShopView {
       button.classList.toggle('hidden',!visible);button.classList.toggle('hero-recommended',recommended);if(visible)count++;
     }
     this.filters.querySelector('.shop-result-summary').textContent=`${count} 件装备${this.filter==='recommended'?' · 推荐可按对手阵容调整':''}`;
+    this.updateRecommendation(hero);
     this.empty?.classList.toggle('hidden',count>0);
+  }
+
+  updateRecommendation(hero) {
+    const note = this.filters.querySelector('.shop-recommendation-note');
+    let text = '';
+    if (this.filter === 'recommended' && hero.heroId === 'kaisa') {
+      const stats = hero.ext?.evolutionStats || (hero.inventory || []).reduce((sum, slot) => {
+        const item = byId.get(slot?.id);
+        for (const key of ['attack', 'ap', 'attackSpeed']) sum[key] += item?.stats[key] || 0;
+        return sum;
+      }, { attack: 0, ap: 0, attackSpeed: 0 });
+      text = `进化进度：Q ${Math.round(stats.attack)}/100 攻击 · W ${Math.round(stats.ap)}/100 法强 · E ${Math.round(stats.attackSpeed * 100)}/100% 攻速。海妖 + 无尽进化 Q；纳什 + 爆裂魔杖进化 W；海妖 + 纳什 + 狂战士进化 E。`;
+    } else if (this.filter === 'recommended' && hero.heroId === 'twistedfate') {
+      text = '卡牌法师路线：卢登补法强与法力，巫妖强化选牌后的普攻；黄牌定身接 Q，蓝牌回蓝。疾射火炮增加选牌普攻距离。';
+    }
+    note.classList.toggle('hidden', !text);
+    if (note.textContent !== text) note.textContent = text;
   }
 
   render() { this.applyFilter();this.update(); }
@@ -101,22 +121,28 @@ export class ShopView {
     const game = this.getGame(), hero = game.player;
     if (!game.quoteBuy) return;
     if(this.lastHero!==hero.heroId)this.applyFilter();
+    this.updateRecommendation(hero);
     document.getElementById('shop-gold').textContent = Math.floor(hero.gold).toLocaleString();
     for (const button of this.items.children) {
       if(button.classList.contains('hidden'))continue;
       const quote = game.quoteBuy(button.dataset.item);
       const item = byId.get(button.dataset.item);
-      const components = (quote.components || []).map(index => byId.get(hero.inventory[index]?.id)?.name).filter(Boolean);
-      const owned = components.length ? `抵扣 ${quote.discount} · ${components.join('、')}` : '';
-      const signature=JSON.stringify([quote.ok,quote.cost,quote.discount,quote.reason,owned]);if(button.dataset.quote===signature)continue;button.dataset.quote=signature;
+      const requestedCost = quote.requestedCost ?? quote.cost ?? item.cost;
+      const requestedDiscount = quote.requestedDiscount ?? quote.discount ?? 0;
+      const components = (quote.requestedComponents || quote.components || []).map(index => byId.get(hero.inventory[index]?.id)?.name).filter(Boolean);
+      const owned = components.length ? `抵扣 ${requestedDiscount} · ${components.join('、')}` : '';
+      const nextPurchase = quote.componentPurchase ? `先买 ${quote.item.name} · ${quote.cost} 金币` : quote.discount ? '点击合成' : '点击购买';
+      const signature=JSON.stringify([quote.ok,quote.itemId,quote.cost,requestedCost,requestedDiscount,quote.componentPurchase,quote.reason,owned]);if(button.dataset.quote===signature)continue;button.dataset.quote=signature;
       button.disabled = !quote.ok;
-      button.classList.toggle('discounted', quote.discount > 0);
-      button.querySelector('.item-cost').textContent = `${quote.cost ?? item.cost} 金币`;
-      button.querySelector('.item-full-cost').textContent = quote.discount > 0 ? `${item.cost}` : '';
+      button.classList.toggle('discounted', requestedDiscount > 0);
+      button.classList.toggle('auto-component', !!quote.componentPurchase);
+      button.dataset.purchaseItem = quote.ok ? quote.itemId : '';
+      button.querySelector('.item-cost').textContent = `${quote.componentPurchase ? '合成还需 ' : ''}${requestedCost} 金币`;
+      button.querySelector('.item-full-cost').textContent = requestedDiscount > 0 ? `${item.cost}` : '';
       button.querySelector('.item-owned').textContent = owned;
-      button.querySelector('.item-buy-state').textContent = quote.ok ? quote.discount?'点击合成':'点击购买' : quote.reason;
-      button.title = `${item.name}\n${item.description}\n${owned}\n${quote.ok ? '点击购买，自动合成已有散件' : quote.reason}`;
-      button.setAttribute('aria-label',`${item.name}，${quote.cost} 金币，${owned}，${quote.ok?'可购买':quote.reason}`);
+      button.querySelector('.item-buy-state').textContent = quote.ok ? nextPurchase : quote.reason;
+      button.title = `${item.name}\n${item.description}\n合成还需 ${requestedCost} 金币\n${owned}\n${quote.ok ? quote.componentPurchase ? `${nextPurchase}\n本次购买一件所需散件，继续点击可逐步合成` : '点击购买，自动合成已有散件' : quote.reason}`;
+      button.setAttribute('aria-label',`${item.name}，合成还需 ${requestedCost} 金币，${owned}，${quote.ok?nextPurchase:quote.reason}`);
     }
     for (const button of this.inventory.children) {
       const index = Number(button.dataset.slot), slot = hero.inventory[index], item = byId.get(slot?.id);

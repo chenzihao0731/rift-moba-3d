@@ -71,12 +71,93 @@ export function purchaseQuote(hero, itemId, { canShop = true } = {}) {
 export function buyEquipment(hero, itemId, options) {
   const quote = purchaseQuote(hero, itemId, options);
   if (!quote.ok) return quote;
+  applyPurchase(hero, quote);
+  return quote;
+}
+
+function applyPurchase(hero, quote) {
   const inventory = inventoryOf(hero);
   for (const index of quote.components) inventory[index] = null;
   inventory[quote.slot] = quote.stack ? { ...inventory[quote.slot], count: countOf(inventory[quote.slot]) + 1 }
-    : { id: itemId, count: 1, cooldown: 0 };
+    : { id: quote.itemId, count: 1, cooldown: 0 };
   hero.gold -= quote.cost;
   hero.inventory = inventory;
+}
+
+// Retain one deterministic assignment for every disjoint slot subset. An exact
+// intermediate terminates its branch; its children are never counted a second time.
+function recipePlans(itemId, inventory, ancestry = new Set()) {
+  const item = ITEM.get(itemId), plans = new Map([[0, { itemId, exact: false, children: [] }]]);
+  if (!item || ancestry.has(itemId)) return plans;
+  inventory.forEach((slot, index) => {
+    if (slot?.id === itemId) plans.set(1 << index, { itemId, exact: true, children: [] });
+  });
+  if (item.recipe?.length) {
+    const next = new Set(ancestry); next.add(itemId);
+    let children = new Map([[0, []]]);
+    for (const ingredient of item.recipe) {
+      const matching = recipePlans(ingredient, inventory, next), combined = new Map();
+      for (const [leftMask, left] of children) for (const [rightMask, right] of matching) {
+        const mask = leftMask | rightMask;
+        if (!(leftMask & rightMask) && !combined.has(mask)) combined.set(mask, [...left, right]);
+      }
+      children = combined;
+    }
+    for (const [mask, branches] of children) if (mask === 0 || !plans.has(mask)) plans.set(mask, { itemId, exact: false, children: branches });
+  }
+  return plans;
+}
+
+function missingMaterials(item, inventory, components) {
+  const mask = components.reduce((value, index) => value | 1 << index, 0);
+  const plan = recipePlans(item.id, inventory).get(mask);
+  const candidates = new Set();
+  function visit(node, root = false) {
+    if (!node || node.exact) return;
+    if (!root) candidates.add(node.itemId);
+    for (const child of node.children) visit(child);
+  }
+  visit(plan, true);
+  return [...candidates];
+}
+
+function requestedFields(quote, requested, componentPurchase = false, gold) {
+  return { ...quote, requestedItem: requested.item, requestedItemId: requested.itemId,
+    requestedCost: requested.cost, requestedFullCost: requested.fullCost,
+    requestedDiscount: requested.discount, requestedComponents: requested.components,
+    requestedMissingGold: requested.missingGold, componentPurchase,
+    remainingGold: Number.isFinite(gold) ? gold - (quote.ok ? quote.cost : 0) : null,
+    fallback: componentPurchase ? { itemId: quote.itemId, name: quote.item.name, cost: quote.cost, fullCost: quote.fullCost, reason: 'insufficient-gold' } : null };
+}
+
+// A click always makes at most one transaction. Complete the requested item first;
+// otherwise invest in the most expensive unmet ingredient the player can legally
+// buy now, including upgrading an intermediate with its already owned components.
+export function smartPurchaseQuote(hero, itemId, options = {}) {
+  const requested = purchaseQuote(hero, itemId, options);
+  const wrap = quote => requestedFields(quote, requested, false, hero?.gold);
+  if (!Number.isFinite(hero?.gold) || hero.gold < 0) return wrap(failure(requested, 'invalid-gold', '金币状态无效'));
+  if (requested.ok || !requested.item?.recipe?.length) return wrap(requested);
+  if (!['insufficient-gold', 'inventory-full'].includes(requested.code) || requested.missingGold <= 0) return wrap(requested);
+  const candidates = [];
+  for (const ingredient of missingMaterials(requested.item, inventoryOf(hero), requested.components)) {
+    const quote = purchaseQuote(hero, ingredient, options);
+    if (!quote.ok) continue;
+    const projected = { ...hero, inventory: inventoryOf(hero) };
+    applyPurchase(projected, quote);
+    const next = purchaseQuote(projected, itemId, options);
+    // Do not spend on a duplicate or on a branch that displaces another fulfilled
+    // branch. Every gold spent here must remain credit toward the requested item.
+    if (next.discount + 1e-8 < requested.discount + quote.cost || !next.components.includes(quote.slot)) continue;
+    candidates.push(quote);
+  }
+  candidates.sort((a, b) => b.fullCost - a.fullCost || b.cost - a.cost);
+  return candidates.length ? requestedFields(candidates[0], requested, true, hero.gold) : wrap(requested);
+}
+
+export function buySmartEquipment(hero, itemId, options = {}) {
+  const quote = smartPurchaseQuote(hero, itemId, options);
+  if (quote.ok) applyPurchase(hero, quote);
   return quote;
 }
 

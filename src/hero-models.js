@@ -1,9 +1,11 @@
 import * as THREE from 'three';
+import {createTriadHero,TRIAD_HERO_IDS} from './triad-models.js';
 
-export const EXTENDED_HERO_IDS=['annie','brand','morgana','veigar','ziggs','fizz','masteryi','leesin','darius','malphite','blitzcrank','leona','vayne','caitlyn','missfortune','sona'];
+export const EXTENDED_HERO_IDS=['annie','brand','morgana','veigar','ziggs','fizz','masteryi','leesin','darius','malphite','blitzcrank','leona','vayne','caitlyn','missfortune','sona',...TRIAD_HERO_IDS];
 
 // Parts use the existing material/geometry cache and are merged by Actors.
 export function createExtendedHero(e,kit){
+ if(TRIAD_HERO_IDS.includes(e.heroId))return createTriadHero(e,kit);
  const {sphere,box,cylinder,ring,rod,part,geo}=kit,id=e.heroId,g=new THREE.Group(),body=new THREE.Group(),team=e.team==='blue'?0x45deee:0xee5062,skin=0xf4c9af;
  g.add(body);g.userData.body=body;ring(g,team,['malphite','blitzcrank'].includes(id)?2.2:1.6,.12,.07);
  const small=['annie','veigar','ziggs'].includes(id),height=small?2.6:3.6,legs=[];
